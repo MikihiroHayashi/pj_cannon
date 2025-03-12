@@ -1,0 +1,12 @@
+*.csproj
+*.sln
+.vs/*
+Library/*
+obj/Debug/*
+Logs/*.log
+UserSettings/*
+pj_cannon/UserSettings/EditorUserSettings.asset
+pj_cannon/UserSettings/Search.index
+pj_cannon/UserSettings/Search.settings
+pj_cannon/UserSettings/Layouts/CurrentMaximizeLayout.dwlt
+pj_cannon/UserSettings/Layouts/default-2022.dwlt
