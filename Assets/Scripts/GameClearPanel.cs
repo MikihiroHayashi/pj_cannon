@@ -39,7 +39,7 @@ public class GameClearPanel : MonoBehaviour
         // 最終スコアを表示
         if (finalScoreText != null)
         {
-            finalScoreText.text = "スコア: " + score.ToString();
+            finalScoreText.text = "SCORE: " + score.ToString();
         }
         
         // ハイスコア表示（オプション）
@@ -62,7 +62,7 @@ public class GameClearPanel : MonoBehaviour
             // 新記録表示（オプション）
             if (highScoreText != null)
             {
-                highScoreText.text = "新記録: " + highScore.ToString();
+                highScoreText.text = "NEW RECORD: " + highScore.ToString();
                 // アニメーション等でハイライト
             }
         }
@@ -70,7 +70,7 @@ public class GameClearPanel : MonoBehaviour
         {
             if (highScoreText != null)
             {
-                highScoreText.text = "ハイスコア: " + highScore.ToString();
+                highScoreText.text = "HIGH SCORE: " + highScore.ToString();
             }
         }
     }

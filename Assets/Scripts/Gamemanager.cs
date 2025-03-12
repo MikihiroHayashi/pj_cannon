@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 // ゲームマネージャー - ステージ管理機能追加版
 public class GameManager : MonoBehaviour
@@ -28,14 +31,24 @@ public class GameManager : MonoBehaviour
     public Slider timerSlider;              // タイマースライダー
     public Image timerBar;                  // タイマーバー
     public GameObject gameOverPanel;        // ゲームオーバーパネル
-    public GameObject gameClearPanel;       // ゲームクリアパネル
+    public GameObject gameClearPanel;       // ゲームクリアパネル（最終クリア用）
+    
+    [Header("ステージ遷移UI")]
+    public GameObject stageClearUI;         // ステージクリアUI
+    public TMP_Text stageClearText;         // ステージクリアテキスト
+    public GameObject stageStartUI;         // ステージ開始UI
+    public TMP_Text stageStartText;         // ステージ開始テキスト
+    public float stageClearDisplayTime = 2.0f; // ステージクリアUI表示時間
+    public float stageStartDisplayTime = 1.0f; // ステージ開始UI表示時間
 
     // 内部変数
     private int currentScore = 0;           // 現在のスコア
-    private int destroyedTargets = 0;       // 破壊したターゲット数
-    internal int remainingShots;            // 残り発射数
+    internal int destroyedTargets = 0;       // 破壊したターゲット数 (privateからinternalに変更)
+    internal int remainingShots;            // 残り発射数 
     internal float remainingTime;           // 残り時間
     private TargetGenerator targetGenerator; // ターゲット生成クラス参照
+    private bool isGameInitialized = false;  // ゲームが初期化済みかどうかのフラグ
+    private bool isTransitioning = false;    // ステージ遷移中フラグ
 
     void Awake()
     {
@@ -48,6 +61,7 @@ public class GameManager : MonoBehaviour
         else
         {
             Destroy(gameObject);
+            return;
         }
     }
 
@@ -56,29 +70,61 @@ public class GameManager : MonoBehaviour
         // ターゲット生成クラスの参照を取得
         targetGenerator = FindObjectOfType<TargetGenerator>();
         
-        // ゲーム初期化
-        InitializeGame();
+        // ゲーム初期化 (開始時に一度だけ実行)
+        if (!isGameInitialized)
+        {
+            // 初期ステージ開始表示
+            StartCoroutine(ShowStageStart(currentStage));
+            InitializeGame();
+            isGameInitialized = true;
+        }
     }
     
     // ゲーム初期化
     void InitializeGame()
     {
+        Debug.Log("GameManager.InitializeGame() 呼び出し");
+        
         // ゲーム変数の初期化
         currentScore = 0;
         destroyedTargets = 0;
-        remainingShots = shotLimit;
-        remainingTime = gameTime;
         
         // ターゲット生成器が存在する場合はそれを使用
         if (targetGenerator != null)
         {
             targetGenerator.currentStage = currentStage;
-            targetGenerator.InitializeCurrentStage();
+            
+            // ステージ設定を取得
+            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+            if (config != null)
+            {
+                // ステージ設定から値を設定
+                shotLimit = config.shotLimit;
+                gameTime = config.timeLimit;
+                requiredTargetsToDestroy = config.requiredTargetsToDestroy;
+                
+                Debug.Log($"ステージ設定をロード: ショット数={shotLimit}, 時間={gameTime}, 必要ターゲット数={requiredTargetsToDestroy}");
+            }
+            
+            // 既に初期化済みでない場合のみターゲットを生成
+            if (!targetGenerator.IsStageInitialized(currentStage))
+            {
+                targetGenerator.InitializeCurrentStage();
+            }
+            
+            // ターゲット数を取得（生成後）
+            targetCount = targetGenerator.GetGeneratedTargetsCount();
+            
+            // クリア条件がおかしい場合は修正（0以下や全体数より大きい場合）
+            if (requiredTargetsToDestroy <= 0 || requiredTargetsToDestroy > targetCount)
+            {
+                requiredTargetsToDestroy = targetCount;
+                Debug.Log($"クリア条件を修正: 全ターゲット破壊に設定 ({requiredTargetsToDestroy})");
+            }
             
             // ステージ名を表示
             if (stageNameText != null)
             {
-                TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
                 stageNameText.text = config.stageName;
             }
         }
@@ -94,6 +140,12 @@ public class GameManager : MonoBehaviour
             }
         }
         
+        // 残り発射数を設定
+        remainingShots = shotLimit;
+        
+        // 残り時間を設定
+        remainingTime = gameTime;
+        
         Debug.Log($"ゲーム開始: ターゲット数={targetCount}, " +
                   $"クリア条件={requiredTargetsToDestroy}個破壊, " +
                   $"残り発射数={remainingShots}");
@@ -104,10 +156,15 @@ public class GameManager : MonoBehaviour
         // 結果パネルを非表示に
         if (gameOverPanel) gameOverPanel.SetActive(false);
         if (gameClearPanel) gameClearPanel.SetActive(false);
+        if (stageClearUI) stageClearUI.SetActive(false);
+        if (stageStartUI) stageStartUI.SetActive(false);
     }
 
     void Update()
     {
+        // 遷移中は時間更新しない
+        if (isTransitioning) return;
+
         // タイマー更新
         UpdateTimer();
     }
@@ -160,6 +217,9 @@ public class GameManager : MonoBehaviour
         // UI更新
         UpdateUI();
 
+        // クリア条件のデバッグ出力
+        Debug.Log($"[AddScore] クリア条件チェック前: {destroyedTargets}/{requiredTargetsToDestroy}");
+        
         // クリア条件チェック
         CheckClearCondition();
     }
@@ -167,10 +227,25 @@ public class GameManager : MonoBehaviour
     // クリア条件をチェック
     private void CheckClearCondition()
     {
+        // デバッグログを追加
+        Debug.Log($"[CheckClearCondition] 破壊ターゲット:{destroyedTargets}, 必要数:{requiredTargetsToDestroy}, 遷移中:{isTransitioning}");
+        
+        // 遷移中は処理しない
+        if (isTransitioning) 
+        {
+            Debug.Log("[CheckClearCondition] 遷移中のため処理をスキップ");
+            return;
+        }
+        
         // 必要数のターゲットを破壊したらクリア
         if (destroyedTargets >= requiredTargetsToDestroy)
         {
+            Debug.Log($"[CheckClearCondition] クリア条件達成！ - 破壊数:{destroyedTargets}, 必要数:{requiredTargetsToDestroy}");
             GameClear();
+        }
+        else
+        {
+            Debug.Log($"[CheckClearCondition] クリア条件未達成 - あと {requiredTargetsToDestroy - destroyedTargets} 個必要");
         }
     }
 
@@ -185,6 +260,9 @@ public class GameManager : MonoBehaviour
     // 発射回数減少
     public void ShotFired()
     {
+        // 遷移中は処理しない
+        if (isTransitioning) return;
+        
         remainingShots--;
         Debug.Log($"発射回数減少: 残り={remainingShots}");
 
@@ -201,13 +279,13 @@ public class GameManager : MonoBehaviour
     // UI更新
     public void UpdateUI()
     {
-        if (scoreText) scoreText.text = "Score: " + currentScore.ToString();
-        if (shotText) shotText.text = "残り発射数: " + remainingShots.ToString();
+        if (scoreText) scoreText.text = "SCORE: " + currentScore.ToString();
+        if (shotText) shotText.text = "SHOTS LEFT: " + remainingShots.ToString();
         
         // ターゲット数表示（新規追加）
         if (targetCountText)
         {
-            targetCountText.text = $"ターゲット: {destroyedTargets}/{requiredTargetsToDestroy}";
+            targetCountText.text = $"TARGETS: {destroyedTargets}/{requiredTargetsToDestroy}";
         }
     }
 
@@ -223,69 +301,154 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("ゲームクリア！最終スコア: " + currentScore);
         
-        if (gameClearPanel)
+        // 遷移中フラグをオン
+        isTransitioning = true;
+        
+        // 最終ステージかどうかをチェック
+        bool isFinalStage = (currentStage >= targetGenerator.stages.Length - 1);
+        
+        if (isFinalStage)
         {
-            // クリアパネルを表示
-            gameClearPanel.SetActive(true);
-            
-            // GameClearPanelコンポーネントがあれば初期化
-            GameClearPanel clearPanelScript = gameClearPanel.GetComponent<GameClearPanel>();
-            if (clearPanelScript != null)
+            // 最終ステージの場合は最終クリアパネルを表示
+            if (gameClearPanel)
             {
-                clearPanelScript.Initialize(currentScore);
+                gameClearPanel.SetActive(true);
+                
+                // GameClearPanelコンポーネントがあれば初期化
+                GameClearPanel clearPanelScript = gameClearPanel.GetComponent<GameClearPanel>();
+                if (clearPanelScript != null)
+                {
+                    clearPanelScript.Initialize(currentScore);
+                }
             }
-            
-            // 自動的に次のステージに進む設定がオンなら、次のステージに進む
+        }
+        else
+        {
+            // 通常のステージクリア時の処理
             if (autoAdvanceStages && targetGenerator != null)
             {
-                StartCoroutine(AdvanceToNextStageAfterDelay(3.0f));
+                // 新しいステージ遷移プロセスを開始
+                StartCoroutine(PerformStageTransition());
             }
         }
     }
     
-    // 次のステージに進むコルーチン
-    private IEnumerator AdvanceToNextStageAfterDelay(float delay)
+    // ステージ遷移処理のコルーチン
+    private IEnumerator PerformStageTransition()
     {
-        yield return new WaitForSeconds(delay);
+        // 1. ステージクリアUIを表示（2秒）
+        if (stageClearUI && stageClearText)
+        {
+            stageClearUI.SetActive(true);
+            stageClearText.text = $"STAGE {currentStage + 1} CLEAR!"; // ステージ番号は0始まりなので+1
+            
+            // 効果音や演出を追加可能
+            
+            yield return new WaitForSeconds(stageClearDisplayTime);
+            stageClearUI.SetActive(false);
+        }
+        else
+        {
+            yield return new WaitForSeconds(1.0f); // UIがない場合も少し待機
+        }
         
-        // クリアパネルを非表示
-        if (gameClearPanel) gameClearPanel.SetActive(false);
-        
-        // 次のステージへ
-        AdvanceToNextStage();
-    }
-    
-    // 次のステージに進む
-    public void AdvanceToNextStage()
-    {
+        // 2. 次のステージ番号に進む
         currentStage++;
         
-        // ターゲット生成器がなければ何もしない
-        if (targetGenerator == null)
+        // ターゲット生成器の更新
+        if (targetGenerator != null)
         {
-            Debug.LogWarning("TargetGeneratorが見つかりません。ステージ進行ができません。");
-            return;
+            targetGenerator.currentStage = currentStage;
+            targetGenerator.ClearTargets(); // 既存のターゲットをクリア
+            targetGenerator.InitializeCurrentStage(); // 新しいステージのターゲットを生成
         }
         
-        // 最後のステージを超えた場合の処理
-        if (currentStage >= targetGenerator.stages.Length)
-        {
-            Debug.Log("全ステージクリア！ゲーム終了またはループ");
-            
-            // オプション1: 最初のステージに戻る
-            currentStage = 0;
-            
-            // オプション2: ゲーム終了（必要に応じて実装）
-            // ShowGameCompleteScreen();
-        }
+        // 3. ステージ開始UIを表示（1秒）
+        yield return StartCoroutine(ShowStageStart(currentStage));
         
-        // ターゲット生成器にステージを設定し、初期化
-        targetGenerator.currentStage = currentStage;
+        // 4. ゲーム変数の初期化（ターゲット数、ショット数など）
+        InitializeGameVarsForNewStage();
         
-        // ゲームを初期化
-        InitializeGame();
+        // 遷移終了
+        isTransitioning = false;
     }
-
+    
+    // ステージ開始表示のコルーチン
+    private IEnumerator ShowStageStart(int stageIndex)
+    {
+        if (stageStartUI && stageStartText)
+        {
+            // ステージ情報を取得
+            string stageName = "STAGE " + (stageIndex + 1);
+            if (targetGenerator != null)
+            {
+                TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+                if (config != null && !string.IsNullOrEmpty(config.stageName))
+                {
+                    stageName = config.stageName.ToUpper();
+                }
+            }
+            
+            stageStartUI.SetActive(true);
+            stageStartText.text = stageName;
+            
+            // 効果音や演出を追加可能
+            
+            yield return new WaitForSeconds(stageStartDisplayTime);
+            stageStartUI.SetActive(false);
+        }
+    }
+    
+    // 新しいステージ用にゲーム変数を初期化
+    private void InitializeGameVarsForNewStage()
+    {
+        // スコアはそのまま継続
+        // currentScore = 0; // スコアをリセットする場合はコメント解除
+        
+        // ターゲット破壊数はリセット
+        destroyedTargets = 0;
+        
+        // ステージ設定を取得
+        if (targetGenerator != null)
+        {
+            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+            if (config != null)
+            {
+                // ステージ設定からパラメータを更新
+                shotLimit = config.shotLimit;
+                gameTime = config.timeLimit;
+                requiredTargetsToDestroy = config.requiredTargetsToDestroy;
+                
+                // ステージ名を更新
+                if (stageNameText != null)
+                {
+                    stageNameText.text = config.stageName;
+                }
+            }
+        }
+        
+        // 残り発射数をリセット
+        remainingShots = shotLimit;
+        
+        // 残り時間をリセット
+        remainingTime = gameTime;
+        
+        // ターゲット数を更新
+        targetCount = GameObject.FindGameObjectsWithTag("Target").Length;
+        
+        // クリア条件が未設定の場合、全ターゲット破壊を設定
+        if (requiredTargetsToDestroy <= 0 || requiredTargetsToDestroy > targetCount)
+        {
+            requiredTargetsToDestroy = targetCount;
+        }
+        
+        // UI更新
+        UpdateUI();
+        
+        Debug.Log($"新しいステージ{currentStage + 1}の初期化完了: ターゲット数={targetCount}, " +
+                  $"クリア条件={requiredTargetsToDestroy}個破壊, 残り発射数={remainingShots}");
+    }
+    
     // リスタート処理 - シーンをリロードする方法
     public void RestartGame()
     {
@@ -322,6 +485,11 @@ public class GameManager : MonoBehaviour
         // ゲームクリア/ゲームオーバーパネルを非表示
         if (gameClearPanel) gameClearPanel.SetActive(false);
         if (gameOverPanel) gameOverPanel.SetActive(false);
+        if (stageClearUI) stageClearUI.SetActive(false);
+        if (stageStartUI) stageStartUI.SetActive(false);
+        
+        // 遷移中フラグをオフ
+        isTransitioning = false;
         
         Debug.Log("ゲームを初期状態に戻しました");
     }
@@ -332,7 +500,8 @@ public class GameManager : MonoBehaviour
         // TargetGeneratorがあれば利用
         if (targetGenerator != null)
         {
-            targetGenerator.InitializeCurrentStage();
+            targetGenerator.ClearTargets(); // 既存のターゲットをクリア
+            targetGenerator.InitializeCurrentStage(); // 新しいターゲットを生成
         }
         else
         {
@@ -419,10 +588,70 @@ public class GameManager : MonoBehaviour
             return;
         }
         
+        // 遷移中フラグをオン
+        isTransitioning = true;
+        
         currentStage = stageIndex;
         targetGenerator.currentStage = stageIndex;
+        targetGenerator.ClearTargets(); // 既存のターゲットをクリア
+        
+        // ステージ開始表示を行い、その後ゲームを初期化
+        StartCoroutine(JumpToStageSequence(stageIndex));
+    }
+    
+    // ステージにジャンプする際のシーケンス
+    private IEnumerator JumpToStageSequence(int stageIndex)
+    {
+        // ステージ開始UIを表示
+        yield return StartCoroutine(ShowStageStart(stageIndex));
         
         // ゲームを初期化
         InitializeGame();
+        
+        // 遷移中フラグをオフ
+        isTransitioning = false;
+    }
+    
+    // デバッグ用 - パブリックにしたクリア条件チェック
+    public void CheckClearConditionPublic()
+    {
+        Debug.Log("強制的にクリア条件チェックを実行します");
+        CheckClearCondition();
+    }
+    
+    // デバッグ用 - 強制的にクリア
+    public void ForceGameClear()
+    {
+        Debug.Log("強制的にクリア処理を実行します");
+        GameClear();
     }
 }
+
+#if UNITY_EDITOR
+// GameManager.csに追加するデバッグ機能
+[CustomEditor(typeof(GameManager))]
+public class GameManagerEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+        
+        GameManager gameManager = (GameManager)target;
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("デバッグ機能", EditorStyles.boldLabel);
+        
+        if (GUILayout.Button("クリア条件チェック"))
+        {
+            gameManager.CheckClearConditionPublic();
+        }
+        
+        if (GUILayout.Button("強制クリア"))
+        {
+            gameManager.ForceGameClear();
+        }
+        
+        EditorGUILayout.LabelField($"破壊ターゲット: {gameManager.destroyedTargets}/{gameManager.requiredTargetsToDestroy}");
+    }
+}
+#endif

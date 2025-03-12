@@ -19,6 +19,7 @@ public class Target : MonoBehaviour
     public Vector3 rotationAxis = Vector3.up; // 回転軸
 
     private Animator animator;            // アニメーター
+    private bool isHit = false;           // ヒット済みフラグ（重複防止用）
 
     void Start()
     {
@@ -40,6 +41,16 @@ public class Target : MonoBehaviour
     // ヒット時の処理
     public void OnHit()
     {
+        // 既にヒット済みなら処理しない
+        if (isHit)
+        {
+            Debug.Log("Target.OnHit(): 既にヒット済みのため処理をスキップ: " + gameObject.name);
+            return;
+        }
+        
+        // ヒット済みにする
+        isHit = true;
+        
         Debug.Log("Target.OnHit()が呼び出されました: " + gameObject.name);
         
         try
@@ -47,7 +58,15 @@ public class Target : MonoBehaviour
             // スコア加算（ゲームマネージャー経由）
             if (GameManager.Instance != null)
             {
+                // ヒット前のターゲット数をデバッグ表示
+                Debug.Log($"[Target.OnHit] ヒット前: 破壊ターゲット={GameManager.Instance.destroyedTargets}, 必要数={GameManager.Instance.requiredTargetsToDestroy}");
+                
+                // スコア加算（これによりdestroyedTargetsもインクリメントされる）
                 GameManager.Instance.AddScore(scoreValue);
+                
+                // ヒット後のターゲット数をデバッグ表示
+                Debug.Log($"[Target.OnHit] ヒット後: 破壊ターゲット={GameManager.Instance.destroyedTargets}, 必要数={GameManager.Instance.requiredTargetsToDestroy}");
+                
                 Debug.Log("スコアを加算しました: " + scoreValue);
             }
             else
@@ -115,7 +134,7 @@ public class Target : MonoBehaviour
         // 砲弾が衝突した場合
         if (collision.gameObject.CompareTag("Cannonball") || collision.gameObject.GetComponent<Cannonball>() != null)
         {
-            Debug.Log("砲弾との衝突を検出しました");
+            Debug.Log("砲弾との衝突を検出しました: " + collision.gameObject.name);
             // ヒット処理を呼び出す
             OnHit();
         }
@@ -129,7 +148,7 @@ public class Target : MonoBehaviour
         // 砲弾が衝突した場合
         if (other.gameObject.CompareTag("Cannonball") || other.gameObject.GetComponent<Cannonball>() != null)
         {
-            Debug.Log("砲弾とのトリガー衝突を検出しました");
+            Debug.Log("砲弾とのトリガー衝突を検出しました: " + other.gameObject.name);
             // ヒット処理を呼び出す
             OnHit();
         }

@@ -20,6 +20,7 @@ public class Cannonball : MonoBehaviour
     private float maxLifeTime = 10f;        // 最大生存時間
     private bool gravityChanged = false;    // 重力変化フラグ
     private Vector3 prevPosition;           // 前フレームの位置
+    private bool hasHitTarget = false;      // ターゲットヒットフラグ
 
     // 砲弾の初期化
     public void Initialize(Vector3 direction, float power, CannonController.BallisticType type,
@@ -125,6 +126,14 @@ public class Cannonball : MonoBehaviour
         // 的に当たった場合
         if (collision.gameObject.CompareTag("Target") || collision.gameObject.GetComponent<Target>() != null)
         {
+            // ターゲット衝突フラグを立てる
+            if (hasHitTarget)
+            {
+                Debug.Log("既にターゲットに衝突済みのため処理をスキップ");
+                return;
+            }
+            hasHitTarget = true;
+            
             Debug.Log("Targetに衝突しました: " + collision.gameObject.name);
             
             // 的のヒット処理
@@ -174,6 +183,14 @@ public class Cannonball : MonoBehaviour
         // 的に当たった場合
         if (other.gameObject.CompareTag("Target") || other.gameObject.GetComponent<Target>() != null)
         {
+            // ターゲット衝突フラグを立てる
+            if (hasHitTarget)
+            {
+                Debug.Log("既にターゲットに衝突済みのため処理をスキップ");
+                return;
+            }
+            hasHitTarget = true;
+            
             Debug.Log("Targetにトリガー衝突しました: " + other.gameObject.name);
             
             // 的のヒット処理

@@ -51,36 +51,56 @@ public class TargetGenerator : MonoBehaviour
     public int maxPlacementAttempts = 30;          // 配置の最大試行回数
     
     private List<GameObject> generatedTargets = new List<GameObject>(); // 生成されたターゲットのリスト
+    private Dictionary<int, bool> initializedStages = new Dictionary<int, bool>(); // 初期化済みステージ管理
+    private bool isFirstInitialization = true; // 初回初期化フラグ
     
     void Start()
     {
-        // ゲーム開始時にステージを初期化
-        InitializeCurrentStage();
+        // Start内では特に何もしない - GameManagerから初期化を行う
+        Debug.Log("TargetGenerator.Start() 呼び出し - 初期生成はGameManagerから実行されます");
+    }
+    
+    // 現在のステージが初期化済みかどうかを確認
+    public bool IsStageInitialized(int stageIndex)
+    {
+        return initializedStages.ContainsKey(stageIndex) && initializedStages[stageIndex];
+    }
+    
+    // 生成されたターゲット数を取得するメソッド
+    public int GetGeneratedTargetsCount()
+    {
+        return generatedTargets.Count;
     }
     
     // 現在のステージを初期化
     public void InitializeCurrentStage()
     {
-        // 既存のターゲットをクリア
-        ClearTargets();
+        Debug.Log($"TargetGenerator.InitializeCurrentStage() 呼び出し - ステージ:{currentStage}, 初回初期化:{isFirstInitialization}");
         
-        // ステージの範囲チェック
-        if (currentStage < 0 || currentStage >= stages.Length)
+        // 初回初期化時または初期化されていないステージの場合のみターゲットを生成
+        if (isFirstInitialization || !IsStageInitialized(currentStage))
         {
-            Debug.LogError($"ステージインデックス {currentStage} が範囲外です。ステージ数: {stages.Length}");
-            currentStage = 0; // 安全のため0に設定
+            // ターゲットを生成
+            GenerateTargetsForStage(currentStage);
+            
+            // ステージを初期化済みとしてマーク
+            initializedStages[currentStage] = true;
+            isFirstInitialization = false;
+            
+            // GameManagerにステージ設定を通知
+            UpdateGameManagerStageSettings();
         }
-        
-        // ターゲットを生成
-        GenerateTargetsForStage(currentStage);
-        
-        // GameManagerにステージ設定を通知
-        UpdateGameManagerStageSettings();
+        else
+        {
+            Debug.Log($"ステージ {currentStage} は既に初期化済みです。ターゲットは再生成されません。");
+        }
     }
     
     // 既存のターゲットをクリア
     public void ClearTargets()
     {
+        Debug.Log("TargetGenerator.ClearTargets() 呼び出し");
+        
         // 生成したすべてのターゲットを削除
         foreach (GameObject target in generatedTargets)
         {
@@ -117,6 +137,12 @@ public class TargetGenerator : MonoBehaviour
                     DestroyImmediate(target);
                 }
             }
+        }
+        
+        // 現在のステージを未初期化状態にする
+        if (initializedStages.ContainsKey(currentStage))
+        {
+            initializedStages[currentStage] = false;
         }
     }
     
