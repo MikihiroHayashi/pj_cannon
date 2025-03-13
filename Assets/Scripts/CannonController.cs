@@ -56,6 +56,11 @@ public class CannonController : MonoBehaviour
     private Camera mainCamera;           // メインカメラ参照
     private float yAxisMultiplier = 1f;  // Y軸の方向乗数
     private float lastGravityHorizontal; // 前回の水平重力値
+    
+    // パワースライダー自動可変機能用の変数
+    private bool isPowerOscillating = false;  // パワー値が自動変動中かどうか
+    private float oscillationSpeed = 1.0f;    // パワー値の変動速度
+    private float oscillationDirection = 1.0f; // パワー値の変動方向（1.0f:上昇, -1.0f:下降）
 
     // 弾道タイプ
     public enum BallisticType
@@ -109,6 +114,9 @@ public class CannonController : MonoBehaviour
         // マウス入力処理（Unityエディタやデスクトップでの操作用）
         HandleMouseInput();
         
+        // パワーの自動変動を更新
+        UpdatePowerOscillation();
+        
         // 弾道予測表示を更新
         UpdateTrajectoryPreview();
     }
@@ -137,6 +145,9 @@ public class CannonController : MonoBehaviour
             // ドラッグ開始
             isDragging = true;
             lastDragPosition = Input.mousePosition;
+            
+            // パワー自動変動を開始
+            StartPowerOscillation();
         }
 
         // マウスドラッグ中
@@ -165,6 +176,9 @@ public class CannonController : MonoBehaviour
         // マウスボタンを離したらドラッグ終了して発射
         if (Input.GetMouseButtonUp(0) && isDragging)
         {
+            // パワー自動変動を停止
+            StopPowerOscillation();
+            
             // 指を離したタイミングで発射 
             FireCannon();
 
@@ -178,39 +192,69 @@ public class CannonController : MonoBehaviour
             FireCannon();
         }
     }
-    
+
     // 弾道予測表示を更新
+    // CannonController.csのUpdateTrajectoryPreviewメソッドを修正
+
     void UpdateTrajectoryPreview()
     {
         if (trajectoryLine == null) return;
 
         // 発射方向と速度を取得
         Vector3 fireDirection = muzzlePoint.forward;
-        float power = currentPower;
+        float basePower = currentPower;
+
+        // イージング用のパラメータ
+        float easeOutDuration = 0.8f; // Cannonballクラスと同じ値にする
+        float initialSpeedMultiplier = 1.7f; // Cannonballクラスと同じ値にする
 
         // 弾道ラインの頂点リストをクリア
         trajectoryLine.positionCount = trajectorySteps;
 
         // 弾道計算用の変数
         Vector3 position = muzzlePoint.position;
-        Vector3 velocity = fireDirection * power;
+        Vector3 initialVelocity = fireDirection * (basePower * initialSpeedMultiplier); // イージング用の初速
+        Vector3 velocity = initialVelocity;
         float timeStep = 0.016f; // 通常の固定フレームレート (約60FPS)と同じステップ
         float simulationTime = 0f;
         bool gravityChanged = false;
+        bool easeOutComplete = false;
 
         // 各ステップでの位置を計算
         for (int i = 0; i < trajectorySteps; i++)
         {
             // 現在の位置を軌道上の点として設定
             trajectoryLine.SetPosition(i, position);
-            
+
             // シミュレーション時間をインクリメント
             simulationTime += timeStep;
-            
-            // 弾丸タイプに応じて速度変化を計算
+
+            // イージング処理（開始から一定時間）
+            if (!easeOutComplete && simulationTime < easeOutDuration)
+            {
+                // イーズアウト：1 - (1-t)^2
+                float t = simulationTime / easeOutDuration;
+                float easeFactor = 1 - Mathf.Pow(1 - t, 2);
+
+                // 目標速度に徐々に近づける（高速→低速）
+                float startSpeed = basePower * initialSpeedMultiplier; // 初速は高め
+                float targetSpeed = basePower;       // 最終的な速度
+                float currentSpeed = Mathf.Lerp(startSpeed, targetSpeed, easeFactor);
+
+                // 速度ベクトルを更新（方向はそのままで大きさだけ変更）
+                velocity = fireDirection * currentSpeed;
+            }
+            else if (!easeOutComplete)
+            {
+                // イージング完了
+                easeOutComplete = true;
+                velocity = fireDirection * basePower;
+            }
+
             // カスタム重力を適用
             Vector3 gravityForce = calculatedGravityDirection * gravityStrength;
-            
+
+            // 弾丸タイプに応じた動きを計算
             switch (ballisticType)
             {
                 case BallisticType.Rotating:
@@ -239,11 +283,11 @@ public class CannonController : MonoBehaviour
                         Mathf.PerlinNoise(simulationTime * 3f, 1) * 2f - 1f,
                         Mathf.PerlinNoise(simulationTime * 3f, 2) * 2f - 1f
                     ).normalized * curveFactor * noiseValue;
-                    
+
                     velocity += gravityForce * timeStep; // カスタム重力
                     velocity += randomForce * timeStep;
                     break;
-                    
+
                 default:
                     // デフォルトは通常の放物線（カスタム重力使用）
                     velocity += gravityForce * timeStep;
@@ -262,6 +306,9 @@ public class CannonController : MonoBehaviour
         {
             isDragging = true;
             lastDragPosition = Input.mousePosition;
+            
+            // パワー自動変動を開始
+            StartPowerOscillation();
         }
     }
 
@@ -294,6 +341,9 @@ public class CannonController : MonoBehaviour
     // タッチ/クリック終了時のイベント（UI EventTriggerから呼び出し用）
     public void OnEndDrag()
     {
+        // パワー自動変動を停止
+        StopPowerOscillation();
+        
         // ドラッグ終了のみを行う（発射はMobileInputControllerで行う）
         isDragging = false;
     }
@@ -312,6 +362,56 @@ public class CannonController : MonoBehaviour
         
         // 垂直方向の回転（X軸周り）
         verticalPivot.localRotation = Quaternion.Euler(-verticalAngle, 0, 0);
+    }
+    
+    // パワーの自動変動を開始
+    void StartPowerOscillation()
+    {
+        isPowerOscillating = true;
+        // 開始時はパワーを最小値から始める
+        currentPower = powerMin;
+        
+        // スライダーの値を更新
+        if (powerSlider != null)
+        {
+            powerSlider.value = currentPower;
+        }
+        
+        Debug.Log("パワー自動変動開始");
+    }
+
+    // パワーの自動変動を停止
+    void StopPowerOscillation()
+    {
+        isPowerOscillating = false;
+        Debug.Log($"パワー自動変動停止: 値={currentPower}");
+    }
+
+    // パワーの自動変動を更新
+    void UpdatePowerOscillation()
+    {
+        if (!isPowerOscillating) return;
+        
+        // パワー値を更新
+        currentPower += oscillationDirection * oscillationSpeed * Time.deltaTime * (powerMax - powerMin);
+        
+        // 最小値・最大値の範囲内に制限
+        if (currentPower >= powerMax)
+        {
+            currentPower = powerMax;
+            oscillationDirection = -1.0f;  // 方向を反転
+        }
+        else if (currentPower <= powerMin)
+        {
+            currentPower = powerMin;
+            oscillationDirection = 1.0f;   // 方向を反転
+        }
+        
+        // スライダーの値を更新
+        if (powerSlider != null)
+        {
+            powerSlider.value = currentPower;
+        }
     }
 
     // 大砲を発射（外部からも呼び出せるようにpublic）
@@ -422,6 +522,9 @@ public class CannonController : MonoBehaviour
         {
             powerSlider.value = currentPower;
         }
+        
+        // パワー自動変動を停止
+        isPowerOscillating = false;
         
         // 大砲の向きを更新
         UpdateCannonRotation();

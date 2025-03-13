@@ -2,12 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 砲弾クラス - 重力変化タイミングを確実に動作させる完全版
+// 砲弾クラス - イーズアウト効果追加版
 public class Cannonball : MonoBehaviour
 {
     [Header("弾丸設定")]
     public TrailRenderer trailRenderer;     // 軌跡レンダラー
     public GameObject hitEffectPrefab;      // ヒットエフェクト
+    
+    [Header("イージング設定")]
+    public float easeOutDuration = 0.8f;     // イージング期間（秒）
+    public float initialSpeedMultiplier = 1.7f; // 初期速度の倍率（最終速度の何倍か）
 
     // 内部パラメータ
     private CannonController.BallisticType ballisticType; // 弾丸タイプ
@@ -24,6 +28,11 @@ public class Cannonball : MonoBehaviour
     private Vector3 velocity;               // 現在速度
     private Vector3 prevPosition;           // 前フレームの位置
     private bool gravityChanged = false;    // 重力変化フラグ
+    
+    // イージング用変数
+    private Vector3 initialDirection;       // 初期方向
+    private float initialPower;             // 初期パワー
+    private bool easeOutComplete;           // イージング完了フラグ
 
     // デバッグ用
     [Header("デバッグ情報（読み取り専用）")]
@@ -37,7 +46,12 @@ public class Cannonball : MonoBehaviour
     {
         this.position = transform.position;
         this.prevPosition = position;
-        this.velocity = direction.normalized * power;
+        
+        // イーズアウトを適用するため、初期速度を高めに設定
+        this.initialDirection = direction.normalized;
+        this.initialPower = power;
+        this.velocity = direction.normalized * (power * initialSpeedMultiplier); // 初速は高め
+        
         this.ballisticType = type;
         this.curveFactor = curve;
         this.gravityChangeTiming = gravityTiming;
@@ -46,6 +60,7 @@ public class Cannonball : MonoBehaviour
         this.power = power;
         this.gravityChanged = false;
         this.lifeTime = 0f;
+        this.easeOutComplete = false; // イージング完了フラグ
 
         // デバッグ値の初期化
         _gravityChangedDebug = false;
@@ -100,27 +115,56 @@ public class Cannonball : MonoBehaviour
             return;
         }
 
+        // 基本的な発射方向ベクトルと速度の大きさを分離
+        Vector3 directionVector = initialDirection;
+        float currentMagnitude = initialPower;
+
+        // イージング処理（開始から一定時間）
+        if (!easeOutComplete && lifeTime < easeOutDuration)
+        {
+            // イーズアウト：1 - (1-t)^2
+            float t = lifeTime / easeOutDuration;
+            float easeFactor = 1 - Mathf.Pow(1 - t, 2);
+
+            // 目標速度に徐々に近づける（高速→低速）
+            float startSpeed = initialPower * initialSpeedMultiplier; // 初速は高め
+            float targetSpeed = initialPower;       // 最終的な速度
+
+            // 速度の大きさのみをイージングで変更
+            currentMagnitude = Mathf.Lerp(startSpeed, targetSpeed, easeFactor);
+        }
+        else if (!easeOutComplete)
+        {
+            // イージング完了
+            easeOutComplete = true;
+            currentMagnitude = initialPower;
+        }
+
         // カスタム重力ベクトルの適用
         Vector3 gravityForce = gravityDirection * gravityStrength;
-        
-        // 弾丸タイプに応じた動きの計算
+
+        // 初期方向ベクトルに現在の速度の大きさを適用
+        // ※ここでvelocityを直接更新せず、方向と大きさを分けて管理
+        Vector3 baseVelocity = directionVector * currentMagnitude;
+
+        // 弾丸タイプに応じた追加の動き計算
+        Vector3 additionalForce = Vector3.zero;
+
         switch (ballisticType)
         {
             case CannonController.BallisticType.Rotating:
                 // 回転弾の動き（マグナス効果的な動き）
-                Vector3 rotationForce = Vector3.Cross(velocity.normalized, Vector3.up) * curveFactor;
-                velocity += gravityForce * Time.deltaTime; // カスタム重力
-                velocity += rotationForce * Time.deltaTime;
+                additionalForce = Vector3.Cross(directionVector, Vector3.up) * curveFactor;
                 break;
 
             case CannonController.BallisticType.GravityChange:
-                // 重力変化弾の動き - 重要な修正部分
+                // 重力変化弾の動き
                 if (lifeTime >= gravityChangeTiming && !gravityChanged)
                 {
-                    // 重力変化時の効果
-                    velocity += Vector3.up * curveFactor * 10f;
+                    // 重力変化時の効果（垂直方向の力を加える）
+                    additionalForce = Vector3.up * curveFactor * 10f;
                     gravityChanged = true;
-                    
+
                     // 効果発動をログ出力
                     Debug.Log($"重力変化発動: {lifeTime:F2}秒経過（設定: {gravityChangeTiming}秒）");
 
@@ -129,38 +173,41 @@ public class Cannonball : MonoBehaviour
                     {
                         // 色変更
                         trailRenderer.startColor = new Color(0f, 1f, 0.5f, 0.7f);
-                        
+
                         // トレイルをクリア（オプション）
                         trailRenderer.Clear();
                     }
                 }
-                
-                // 重力は毎フレーム適用
-                velocity += gravityForce * Time.deltaTime;
                 break;
 
             case CannonController.BallisticType.WindBased:
                 // 不規則な軌道
                 float noiseValue = Mathf.PerlinNoise(lifeTime * 2f, 0f) * 2f - 1f;
-                Vector3 randomForce = new Vector3(
+                additionalForce = new Vector3(
                     Mathf.PerlinNoise(lifeTime * 3f, 0) * 2f - 1f,
                     Mathf.PerlinNoise(lifeTime * 3f, 1) * 2f - 1f,
                     Mathf.PerlinNoise(lifeTime * 3f, 2) * 2f - 1f
                 ).normalized * curveFactor * noiseValue;
-                
-                velocity += gravityForce * Time.deltaTime; // カスタム重力
-                velocity += randomForce * Time.deltaTime;
                 break;
-                
-            default:
-                // デフォルトは通常の放物線（カスタム重力使用）
-                velocity += gravityForce * Time.deltaTime;
-                break;
+        }
+
+        // 毎フレームの速度更新（イージングが適用された基本速度 + 累積の追加力）
+        velocity += gravityForce * Time.deltaTime;  // 重力適用
+        velocity += additionalForce * Time.deltaTime; // 追加力適用
+
+        // イージング中は、基本速度ベクトルの大きさを維持しつつ、方向だけ現在の速度に合わせる
+        if (!easeOutComplete)
+        {
+            // 現在の速度から方向ベクトルを取得
+            Vector3 currentDirection = velocity.normalized;
+
+            // 方向はそのままに、大きさをイージングで制御
+            velocity = currentDirection * currentMagnitude;
         }
 
         // 位置を更新
         position += velocity * Time.deltaTime;
-        
+
         // 実際のGameObjectの位置を更新
         transform.position = position;
 
@@ -170,14 +217,14 @@ public class Cannonball : MonoBehaviour
         {
             transform.forward = movement.normalized;
         }
-        
-        // レイキャストで衝突検出（物理エンジンを使わない代わり）
+
+        // レイキャストで衝突検出（以下は変更なし）
         RaycastHit hit;
         float distance = Vector3.Distance(prevPosition, position);
-        if (distance > 0.001f)  // 移動距離が微小な場合はスキップ
+        if (distance > 0.001f)
         {
             Vector3 direction = (position - prevPosition).normalized;
-            
+
             if (Physics.Raycast(prevPosition, direction, out hit, distance))
             {
                 // 衝突があった場合
@@ -185,7 +232,7 @@ public class Cannonball : MonoBehaviour
             }
         }
     }
-    
+
     // 衝突処理
     void HandleCollision(RaycastHit hit)
     {
