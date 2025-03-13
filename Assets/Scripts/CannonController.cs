@@ -46,6 +46,8 @@ public class CannonController : MonoBehaviour
     public LineRenderer trajectoryLine;  // 弾道予測線
     public int trajectorySteps = 30;     // 弾道計算のステップ数  
     public float trajectoryDistance = 10f; // 弾道予測の距離
+    public float trajectoryReappearDelay = 1.0f; // 弾道予測線が再表示されるまでの待機時間（秒）
+    public float trajectoryFadeInDuration = 0.2f; // 弾道予測線のフェードイン時間（秒）
     
     private float currentPower;          // 現在の発射力
     private float horizontalAngle = 0f;  // 水平角度
@@ -56,11 +58,10 @@ public class CannonController : MonoBehaviour
     private Camera mainCamera;           // メインカメラ参照
     private float yAxisMultiplier = 1f;  // Y軸の方向乗数
     private float lastGravityHorizontal; // 前回の水平重力値
-    
-    // パワースライダー自動可変機能用の変数
-    private bool isPowerOscillating = false;  // パワー値が自動変動中かどうか
-    private float oscillationSpeed = 1.0f;    // パワー値の変動速度
-    private float oscillationDirection = 1.0f; // パワー値の変動方向（1.0f:上昇, -1.0f:下降）
+    private bool showTrajectory = true;  // 弾道予測線表示フラグ
+    private bool isFadingIn = false;     // フェードイン中フラグ
+    private float fadeStartTime = 0f;    // フェード開始時間
+    private Gradient originalGradient;   // 元のグラデーション保存用
 
     // 弾道タイプ
     public enum BallisticType
@@ -79,6 +80,9 @@ public class CannonController : MonoBehaviour
             powerSlider.minValue = powerMin;
             powerSlider.maxValue = powerMax;
             powerSlider.value = currentPower;
+            
+            // スライダーのイベントを設定
+            powerSlider.onValueChanged.AddListener(OnPowerSliderChanged);
         }
 
         // Y軸反転設定（デフォルトはfalse - 反転しない）
@@ -97,9 +101,102 @@ public class CannonController : MonoBehaviour
             fireButton.onClick.AddListener(FireCannon);
         }
         
+        // 弾道予測線の基本設定
+        if (trajectoryLine != null)
+        {
+            // 線の幅を設定（始点が太く、終点が細い）
+            trajectoryLine.startWidth = 0.15f;
+            trajectoryLine.endWidth = 0.05f;
+            
+            // 線のグラデーション設定
+            SetupBasicTrajectoryGradient();
+        }
+        
         // 重力方向の初期化
         lastGravityHorizontal = gravityHorizontal;
         UpdateGravityDirection();
+        
+        // 初期弾道予測を表示
+        UpdateTrajectoryPreview();
+    }
+    
+    // 基本的な弾道グラデーション設定
+    private void SetupBasicTrajectoryGradient()
+    {
+        if (trajectoryLine == null) return;
+        
+        // グラデーションを作成
+        Gradient gradient = new Gradient();
+        
+        // 単純なグラデーション（始点は不透明、終点は透明）
+        Color startColor = Color.white;
+        startColor.a = 1.0f;
+        
+        Color endColor = Color.white;
+        endColor.a = 0.0f;
+        
+        // 単純なグラデーションカラーキーを設定
+        GradientColorKey[] colorKeys = new GradientColorKey[2];
+        colorKeys[0] = new GradientColorKey(startColor, 0.0f);
+        colorKeys[1] = new GradientColorKey(endColor, 1.0f);
+        
+        // アルファ値のグラデーションキーを設定
+        GradientAlphaKey[] alphaKeys = new GradientAlphaKey[4];
+        alphaKeys[0] = new GradientAlphaKey(1.0f, 0.0f);   // 始点：完全不透明
+        alphaKeys[1] = new GradientAlphaKey(0.8f, 0.3f);   // 30%地点：80%不透明
+        alphaKeys[2] = new GradientAlphaKey(0.4f, 0.7f);   // 70%地点：40%不透明
+        alphaKeys[3] = new GradientAlphaKey(0.0f, 1.0f);   // 終点：完全透明
+        
+        gradient.SetKeys(colorKeys, alphaKeys);
+        
+        // LineRendererにグラデーションを適用
+        trajectoryLine.colorGradient = gradient;
+        
+        // 元のグラデーションを保存
+        originalGradient = gradient;
+    }
+    
+    // 弾道予測線のシェーダー設定
+    private void SetupTrajectoryLineRenderer()
+    {
+        if (trajectoryLine == null) return;
+        
+        // マテリアルを取得または作成
+        Material lineMaterial = new Material(Shader.Find("Custom/TrajectoryDottedLine"));
+        
+        // パラメータを設定
+        lineMaterial.SetColor("_Color", GetColorForBallisticType());
+        lineMaterial.SetFloat("_DotSize", 0.5f);  // ドットサイズ（0～0.99、大きいほど点が大きい）
+        lineMaterial.SetFloat("_ScrollSpeed", 2.0f); // スクロール速度
+        lineMaterial.SetFloat("_FadeLength", 0.7f); // フェード長さ（0～1、小さいほど早く透明になる）
+        
+        // LineRendererにマテリアルを適用
+        trajectoryLine.material = lineMaterial;
+        
+        // 線の幅を設定（始点が太く、終点が細い）
+        trajectoryLine.startWidth = 0.2f;
+        trajectoryLine.endWidth = 0.05f;
+        
+        // テクスチャモードを設定（タイルモード）
+        trajectoryLine.textureMode = LineTextureMode.Tile;
+        
+        Debug.Log($"弾道予測線のシェーダーを設定しました: 弾道タイプ={ballisticType}");
+    }
+
+    // 弾道タイプに基づく色を取得
+    private Color GetColorForBallisticType()
+    {
+        switch (ballisticType)
+        {
+            case BallisticType.Rotating:
+                return new Color(1.0f, 0.5f, 0.0f, 1.0f); // オレンジ色
+            case BallisticType.GravityChange:
+                return new Color(0.0f, 0.8f, 1.0f, 1.0f); // 水色
+            case BallisticType.WindBased:
+                return new Color(0.0f, 0.7f, 0.2f, 1.0f); // 緑色
+            default:
+                return new Color(1.0f, 1.0f, 1.0f, 1.0f); // 白色
+        }
     }
 
     void Update()
@@ -114,11 +211,85 @@ public class CannonController : MonoBehaviour
         // マウス入力処理（Unityエディタやデスクトップでの操作用）
         HandleMouseInput();
         
-        // パワーの自動変動を更新
-        UpdatePowerOscillation();
+        // フェードイン中の処理
+        if (isFadingIn)
+        {
+            UpdateFadeIn();
+        }
+        // 通常の弾道予測表示の更新（表示フラグがtrueの場合のみ）
+        else if (showTrajectory)
+        {
+            UpdateTrajectoryPreview();
+        }
+        else if (trajectoryLine != null && trajectoryLine.enabled)
+        {
+            // フラグがfalseなのに表示されている場合は非表示にする
+            trajectoryLine.enabled = false;
+        }
+    }
+    
+    // フェードインアニメーションの更新
+    private void UpdateFadeIn()
+    {
+        if (trajectoryLine == null) return;
         
-        // 弾道予測表示を更新
+        // 経過時間に基づいてアルファ値を計算（0～1）
+        float elapsedTime = Time.time - fadeStartTime;
+        float normalizedTime = Mathf.Clamp01(elapsedTime / trajectoryFadeInDuration);
+        
+        // フェードイン完了チェック
+        if (normalizedTime >= 1.0f)
+        {
+            // フェードイン完了
+            isFadingIn = false;
+            
+            // 元のグラデーションに戻す
+            if (originalGradient != null)
+            {
+                trajectoryLine.colorGradient = originalGradient;
+            }
+            
+            // 通常の弾道予測を更新
+            UpdateTrajectoryPreview();
+            return;
+        }
+        
+        // 現在のアルファ値でグラデーションを更新
+        UpdateGradientAlpha(normalizedTime);
+        
+        // 弾道予測を更新
         UpdateTrajectoryPreview();
+    }
+    
+    // グラデーションのアルファ値を更新
+    private void UpdateGradientAlpha(float alphaMultiplier)
+    {
+        if (trajectoryLine == null || originalGradient == null) return;
+        
+        // 新しいグラデーションを作成
+        Gradient fadeGradient = new Gradient();
+        
+        // 元のグラデーションからカラーキーをコピー
+        GradientColorKey[] colorKeys = originalGradient.colorKeys;
+        
+        // 元のグラデーションからアルファキーを取得して調整
+        GradientAlphaKey[] originalAlphaKeys = originalGradient.alphaKeys;
+        GradientAlphaKey[] newAlphaKeys = new GradientAlphaKey[originalAlphaKeys.Length];
+        
+        // 各アルファキーに乗数を適用
+        for (int i = 0; i < originalAlphaKeys.Length; i++)
+        {
+            newAlphaKeys[i] = new GradientAlphaKey(
+                originalAlphaKeys[i].alpha * alphaMultiplier,
+                originalAlphaKeys[i].time
+            );
+        }
+        
+        // 新しいグラデーションに適用
+        fadeGradient.SetKeys(colorKeys, newAlphaKeys);
+        
+        // LineRendererに適用
+        trajectoryLine.colorGradient = fadeGradient;
     }
 
     // 重力方向を更新
@@ -145,9 +316,6 @@ public class CannonController : MonoBehaviour
             // ドラッグ開始
             isDragging = true;
             lastDragPosition = Input.mousePosition;
-            
-            // パワー自動変動を開始
-            StartPowerOscillation();
         }
 
         // マウスドラッグ中
@@ -176,9 +344,6 @@ public class CannonController : MonoBehaviour
         // マウスボタンを離したらドラッグ終了して発射
         if (Input.GetMouseButtonUp(0) && isDragging)
         {
-            // パワー自動変動を停止
-            StopPowerOscillation();
-            
             // 指を離したタイミングで発射 
             FireCannon();
 
@@ -194,11 +359,15 @@ public class CannonController : MonoBehaviour
     }
 
     // 弾道予測表示を更新
-    // CannonController.csのUpdateTrajectoryPreviewメソッドを修正
-
     void UpdateTrajectoryPreview()
     {
         if (trajectoryLine == null) return;
+        
+        // 弾道線を有効化（表示フラグがtrueの場合のみ）
+        trajectoryLine.enabled = showTrajectory;
+        
+        // 非表示の場合は計算をスキップ
+        if (!showTrajectory) return;
 
         // 発射方向と速度を取得
         Vector3 fireDirection = muzzlePoint.forward;
@@ -306,9 +475,6 @@ public class CannonController : MonoBehaviour
         {
             isDragging = true;
             lastDragPosition = Input.mousePosition;
-            
-            // パワー自動変動を開始
-            StartPowerOscillation();
         }
     }
 
@@ -341,9 +507,6 @@ public class CannonController : MonoBehaviour
     // タッチ/クリック終了時のイベント（UI EventTriggerから呼び出し用）
     public void OnEndDrag()
     {
-        // パワー自動変動を停止
-        StopPowerOscillation();
-        
         // ドラッグ終了のみを行う（発射はMobileInputControllerで行う）
         isDragging = false;
     }
@@ -363,61 +526,27 @@ public class CannonController : MonoBehaviour
         // 垂直方向の回転（X軸周り）
         verticalPivot.localRotation = Quaternion.Euler(-verticalAngle, 0, 0);
     }
-    
-    // パワーの自動変動を開始
-    void StartPowerOscillation()
-    {
-        isPowerOscillating = true;
-        // 開始時はパワーを最小値から始める
-        currentPower = powerMin;
-        
-        // スライダーの値を更新
-        if (powerSlider != null)
-        {
-            powerSlider.value = currentPower;
-        }
-        
-        Debug.Log("パワー自動変動開始");
-    }
-
-    // パワーの自動変動を停止
-    void StopPowerOscillation()
-    {
-        isPowerOscillating = false;
-        Debug.Log($"パワー自動変動停止: 値={currentPower}");
-    }
-
-    // パワーの自動変動を更新
-    void UpdatePowerOscillation()
-    {
-        if (!isPowerOscillating) return;
-        
-        // パワー値を更新
-        currentPower += oscillationDirection * oscillationSpeed * Time.deltaTime * (powerMax - powerMin);
-        
-        // 最小値・最大値の範囲内に制限
-        if (currentPower >= powerMax)
-        {
-            currentPower = powerMax;
-            oscillationDirection = -1.0f;  // 方向を反転
-        }
-        else if (currentPower <= powerMin)
-        {
-            currentPower = powerMin;
-            oscillationDirection = 1.0f;   // 方向を反転
-        }
-        
-        // スライダーの値を更新
-        if (powerSlider != null)
-        {
-            powerSlider.value = currentPower;
-        }
-    }
 
     // 大砲を発射（外部からも呼び出せるようにpublic）
     public void FireCannon()
     {
         Debug.Log("大砲を発射！");
+        
+        // カメラシェイクを適用
+        if (CameraShake.Instance != null)
+        {
+            CameraShake.Instance.ShakeCamera();
+        }
+        
+        // 弾道予測線を非表示にする
+        showTrajectory = false;
+        if (trajectoryLine != null)
+        {
+            trajectoryLine.enabled = false;
+        }
+        
+        // 指定時間後に弾道予測線を再表示
+        StartCoroutine(ReenableTrajectoryAfterDelay(trajectoryReappearDelay));
         
         // ゲームマネージャーに通知
         if (GameManager.Instance != null)
@@ -451,6 +580,38 @@ public class CannonController : MonoBehaviour
         // 発射エフェクト
         PlayFireEffect();
     }
+    
+    // 指定時間後に弾道予測線を再表示するコルーチン
+    private IEnumerator ReenableTrajectoryAfterDelay(float delay)
+    {
+        // 指定時間待機
+        yield return new WaitForSeconds(delay);
+        
+        // フェードイン設定
+        if (trajectoryFadeInDuration > 0)
+        {
+            // フェードインを開始
+            isFadingIn = true;
+            fadeStartTime = Time.time;
+            
+            // 初期アルファは0
+            UpdateGradientAlpha(0);
+            
+            // 表示状態にする
+            showTrajectory = true;
+            if (trajectoryLine != null)
+            {
+                trajectoryLine.enabled = true;
+            }
+        }
+        else
+        {
+            // フェードなしで直接表示
+            showTrajectory = true;
+        }
+        
+        Debug.Log($"弾道予測線を再表示: {delay}秒後, フェードイン={trajectoryFadeInDuration}秒");
+    }
 
     // 発射エフェクト（音やパーティクルなど）
     void PlayFireEffect()
@@ -481,12 +642,19 @@ public class CannonController : MonoBehaviour
     public void OnPowerSliderChanged(float value)
     {
         currentPower = value;
+        // スライダー変更時に弾道予測を更新
+        UpdateTrajectoryPreview();
     }
 
     // 弾道タイプ切替用（UI操作用）
     public void ChangeBallisticType(int typeIndex)
     {
         ballisticType = (BallisticType)typeIndex;
+        
+        // 弾道予測を更新
+        UpdateTrajectoryPreview();
+        
+        Debug.Log($"弾道タイプを変更しました: {ballisticType}");
     }
 
     // Y軸反転設定切替
@@ -523,10 +691,12 @@ public class CannonController : MonoBehaviour
             powerSlider.value = currentPower;
         }
         
-        // パワー自動変動を停止
-        isPowerOscillating = false;
-        
         // 大砲の向きを更新
         UpdateCannonRotation();
+        
+        // 弾道予測を表示状態に設定
+        showTrajectory = true;
+        
+        // 弾道予測は次のUpdateで自動的に更新される
     }
 }

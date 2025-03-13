@@ -174,11 +174,12 @@ MonoBehaviour:
     isUnlocked: 0
     targetCount: 3
     requiredTargetsToDestroy: 3
-    timeLimit: 180
-    shotLimit: 10
-    stageTargetPrefabs: []
-    scoreRange: {x: 0, y: 0}
-    spawnArea: {fileID: 0}
+    timeLimit: 60
+    shotLimit: 100
+    stageTargetPrefabs:
+    - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
+    scoreRange: {x: 100, y: 100}
+    spawnArea: {fileID: 1815152132}
     heightRange: {x: -5, y: 2}
     useRandomRotation: 0
     allowOverlap: 0
@@ -190,17 +191,20 @@ MonoBehaviour:
     distributeTargetsEvenly: 1
   - stageName: Stage 2
     isUnlocked: 0
-    targetCount: 3
-    requiredTargetsToDestroy: 3
-    timeLimit: 180
-    shotLimit: 10
-    stageTargetPrefabs: []
-    scoreRange: {x: 0, y: 0}
-    spawnArea: {fileID: 0}
+    targetCount: 5
+    requiredTargetsToDestroy: 5
+    timeLimit: 30
+    shotLimit: 100
+    stageTargetPrefabs:
+    - {fileID: 6589048845479497798, guid: 8e923b4f615e75b40a805fa4e1f28dda, type: 3}
+    - {fileID: 6589048845479497798, guid: 8753a7ba75e7917468b846f91661cd5e, type: 3}
+    - {fileID: 6589048845479497798, guid: 939b21e94c83de547ab2650961489109, type: 3}
+    scoreRange: {x: 200, y: 400}
+    spawnArea: {fileID: 120804091}
     heightRange: {x: -5, y: 2}
     useRandomRotation: 0
     allowOverlap: 0
-    minTargetDistance: 2
+    minTargetDistance: 5
     enableWind: 0
     windStrength: 0
     enableMovingTargets: 0
@@ -422,10 +426,10 @@ RectTransform:
   - {fileID: 1143355610}
   m_Father: {fileID: 69720502}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &91418145
 MonoBehaviour:
@@ -508,6 +512,60 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &120804089
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 120804090}
+  - component: {fileID: 120804091}
+  m_Layer: 5
+  m_Name: SpawnArea_01
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &120804090
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 120804089}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 17}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 234943659}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 6}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &120804091
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 120804089}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fccad1d57c8bd7a4682bd93062b0ba79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  areaSize: {x: 8, y: 10, z: 12}
+  areaColor: {r: 0.9607843, g: 1, b: 0.2, a: 0.34901962}
+  wireColor: {r: 0.96170855, g: 1, b: 0.19999999, a: 0.8}
+  showInGame: 0
+  fillArea: 1
+  drawWireframe: 1
 --- !u!1 &149540373
 GameObject:
   m_ObjectHideFlags: 0
@@ -1013,6 +1071,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1815152131}
+  - {fileID: 120804090}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -1196,6 +1255,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
+  - component: {fileID: 330585548}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -1220,8 +1280,8 @@ Camera:
   m_GameObject: {fileID: 330585543}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0.5707547, g: 0.80077606, b: 1, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -1321,6 +1381,21 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+--- !u!114 &330585548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e9eee31cac5e9d458bedce3797e065a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultShakeDuration: 0.1
+  defaultShakeIntensity: 0.3
+  defaultShakeFrequency: 40
 --- !u!1 &342423465
 GameObject:
   m_ObjectHideFlags: 0
@@ -1396,7 +1471,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: cc51ab0456731974eb480169fd06fd4c, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1471,8 +1546,8 @@ LineRenderer:
     numCornerVertices: 0
     numCapVertices: 0
     alignment: 0
-    textureMode: 0
-    textureScale: {x: 1, y: 1}
+    textureMode: 1
+    textureScale: {x: 0.1, y: 1}
     shadowBias: 0.5
     generateLightingData: 0
   m_MaskInteraction: 0
@@ -2634,7 +2709,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 980, y: 2120}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1220079103
 GameObject:
@@ -4504,7 +4579,7 @@ MonoBehaviour:
   invertYAxis: 0
   ballisticType: 2
   curveFactor: 0
-  gravityChangeTiming: 0
+  gravityChangeTiming: 0.1
   gravityStrength: 9.81
   gravityHorizontal: 0
   calculatedGravityDirection: {x: 0, y: 0, z: 0}
@@ -4514,6 +4589,8 @@ MonoBehaviour:
   trajectoryLine: {fileID: 344473068}
   trajectorySteps: 60
   trajectoryDistance: 0.5
+  trajectoryReappearDelay: 1
+  trajectoryFadeInDuration: 0.2
 --- !u!4 &7844074966993047541
 Transform:
   m_ObjectHideFlags: 0
