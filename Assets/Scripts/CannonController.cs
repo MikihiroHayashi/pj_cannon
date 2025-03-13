@@ -33,7 +33,11 @@ public class CannonController : MonoBehaviour
     [Header("UI参照")]
     public Slider powerSlider;           // パワーゲージ
     public Button fireButton;            // 発射ボタン
-    public Image trajectoryPathImage;    // 弾道予測表示用
+    
+    [Header("弾道予測設定")]
+    public LineRenderer trajectoryLine;  // 弾道予測線
+    public int trajectorySteps = 30;     // 弾道計算のステップ数  
+    public float trajectoryDistance = 10f; // 弾道予測の距離
 
     private float currentPower;          // 現在の発射力
     private float horizontalAngle = 0f;  // 水平角度
@@ -49,14 +53,14 @@ public class CannonController : MonoBehaviour
     {
         Rotating,       // 回転弾
         GravityChange,  // 重力変化弾
-        WindBased       // 風まかせ弾
+        WindBased       // 風まかせ弾 
     }
 
     void Start()
     {
         // 初期値設定
         currentPower = (powerMin + powerMax) / 2;
-        if (powerSlider != null)
+        if (powerSlider != null) 
         {
             powerSlider.minValue = powerMin;
             powerSlider.maxValue = powerMax;
@@ -84,6 +88,9 @@ public class CannonController : MonoBehaviour
     {
         // マウス入力処理（Unityエディタやデスクトップでの操作用）
         HandleMouseInput();
+        
+        // 弾道予測表示を更新
+        UpdateTrajectoryPreview();
     }
 
     // マウス入力処理
@@ -127,9 +134,9 @@ public class CannonController : MonoBehaviour
         // マウスボタンを離したらドラッグ終了して発射
         if (Input.GetMouseButtonUp(0) && isDragging)
         {
-            // 指を離したタイミングで発射
+            // 指を離したタイミングで発射 
             FireCannon();
-            
+
             // ドラッグ終了
             isDragging = false;
         }
@@ -138,6 +145,33 @@ public class CannonController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             FireCannon();
+        }
+    }
+    
+    // 弾道予測表示を更新
+    void UpdateTrajectoryPreview()
+    {
+        if (trajectoryLine == null) return;
+
+        // 発射方向と速度を取得
+        Vector3 fireDirection = muzzlePoint.forward;
+        float power = currentPower;
+
+        // 弾道計算用の変数
+        Vector3 startPoint = muzzlePoint.position;
+        Vector3 initialVelocity = fireDirection * power;
+        Vector3 gravity = Physics.gravity;
+        float timeStep = trajectoryDistance / trajectorySteps;
+
+        // 弾道ラインの頂点リストをクリア
+        trajectoryLine.positionCount = trajectorySteps;
+
+        // 弾道計算のループ
+        for (int i = 0; i < trajectorySteps; i++)
+        {
+            float time = i * timeStep;
+            Vector3 nextPoint = startPoint + initialVelocity * time + 0.5f * gravity * time * time;
+            trajectoryLine.SetPosition(i, nextPoint);
         }
     }
 
@@ -158,14 +192,14 @@ public class CannonController : MonoBehaviour
         {
             Vector2 currentPosition = eventData.position;
             Vector2 delta = currentPosition - lastDragPosition;
-
+            
             // 感度調整
             delta *= dragSensitivity * 0.1f;
 
             // 水平方向（左右）の回転調整
             horizontalAngle += delta.x;
 
-            // 垂直方向（上下）の回転調整（逆方向に変更）
+            // 垂直方向（上下）の回転調整（逆方向に変更）  
             verticalAngle += delta.y * yAxisMultiplier;
             verticalAngle = Mathf.Clamp(verticalAngle, minElevation, maxElevation);
 
@@ -195,23 +229,12 @@ public class CannonController : MonoBehaviour
     {
         // 水平方向の回転（Y軸周り）
         horizontalPivot.rotation = Quaternion.Euler(0, horizontalAngle, 0);
-
+        
         // 垂直方向の回転（X軸周り）
         verticalPivot.localRotation = Quaternion.Euler(-verticalAngle, 0, 0);
 
         // 開発中は角度をコンソールに表示（デバッグ用）
         Debug.Log($"大砲角度: 水平={horizontalAngle}, 垂直={verticalAngle}");
-    }
-
-    // 弾道予測表示
-    void UpdateTrajectoryPreview()
-    {
-        // 弾道予測表示の実装
-        // 実際のゲームでは点や線で弾道を可視化することが多い
-        if (trajectoryPathImage != null)
-        {
-            // ここに弾道予測の表示ロジックを実装
-        }
     }
 
     // 大砲を発射（外部からも呼び出せるようにpublic）
@@ -231,7 +254,7 @@ public class CannonController : MonoBehaviour
 
         // 砲弾を生成
         GameObject cannonball = Instantiate(cannonballPrefab, muzzlePoint.position, Quaternion.identity);
-
+        
         // 砲弾の初期速度ベクトルを計算
         Vector3 fireDirection = muzzlePoint.forward;
 
@@ -239,7 +262,7 @@ public class CannonController : MonoBehaviour
         Cannonball ballScript = cannonball.GetComponent<Cannonball>();
         if (ballScript != null)
         {
-            ballScript.Initialize(fireDirection, currentPower, ballisticType, curveFactor,
+            ballScript.Initialize(fireDirection, currentPower, ballisticType, curveFactor, 
                                  gravityChangeTiming, windDirection, windStrength);
         }
 
@@ -250,7 +273,7 @@ public class CannonController : MonoBehaviour
     // 発射エフェクト（音やパーティクルなど）
     void PlayFireEffect()
     {
-        // パーティクルエフェクト再生
+        // パーティクルエフェクト再生  
         if (cannonFireEffect != null)
         {
             GameObject effect = Instantiate(cannonFireEffect, muzzlePoint.position, muzzlePoint.rotation);
@@ -296,7 +319,7 @@ public class CannonController : MonoBehaviour
     public string GetDebugInfo()
     {
         return $"水平角度: {horizontalAngle:F1}°\n" +
-               $"垂直角度: {verticalAngle:F1}°\n" +
+               $"垂直角度: {verticalAngle:F1}°\n" + 
                $"発射力: {currentPower:F1}\n" +
                $"弾道タイプ: {ballisticType}";
     }
@@ -310,7 +333,7 @@ public class CannonController : MonoBehaviour
         // 垂直角度を初期値に戻す
         verticalAngle = 30f;
         
-        // パワーを初期値に戻す
+        // パワーを初期値に戻す 
         currentPower = (powerMin + powerMax) / 2;
         if (powerSlider != null)
         {

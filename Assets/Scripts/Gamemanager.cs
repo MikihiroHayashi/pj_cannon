@@ -69,6 +69,22 @@ public class GameManager : MonoBehaviour
     {
         // ターゲット生成クラスの参照を取得
         targetGenerator = FindObjectOfType<TargetGenerator>();
+        if (targetGenerator == null)
+        {
+            Debug.LogError("TargetGeneratorが見つかりません。ゲーム機能が制限されます。");
+        }
+        
+        // GameClearPanelの確認
+        if (gameClearPanel == null)
+        {
+            Debug.LogWarning("gameClearPanelの参照が設定されていません。");
+            // オプション: シーン内から検索を試みる
+            gameClearPanel = GameObject.FindWithTag("GameClearPanel");
+            if (gameClearPanel == null)
+            {
+                Debug.LogWarning("GameClearPanelをタグからも見つけられませんでした。クリア表示ができません。");
+            }
+        }
         
         // ゲーム初期化 (開始時に一度だけ実行)
         if (!isGameInitialized)
@@ -154,8 +170,26 @@ public class GameManager : MonoBehaviour
         UpdateUI();
 
         // 結果パネルを非表示に
-        if (gameOverPanel) gameOverPanel.SetActive(false);
-        if (gameClearPanel) gameClearPanel.SetActive(false);
+        if (gameOverPanel) 
+        {
+            gameOverPanel.SetActive(false);
+            Debug.Log("gameOverPanelを非表示に設定しました");
+        }
+        else
+        {
+            Debug.LogWarning("gameOverPanelの参照がnullです");
+        }
+        
+        if (gameClearPanel) 
+        {
+            gameClearPanel.SetActive(false);
+            Debug.Log("gameClearPanelを非表示に設定しました");
+        }
+        else
+        {
+            Debug.LogWarning("gameClearPanelの参照がnullです");
+        }
+        
         if (stageClearUI) stageClearUI.SetActive(false);
         if (stageStartUI) stageStartUI.SetActive(false);
     }
@@ -304,14 +338,33 @@ public class GameManager : MonoBehaviour
         // 遷移中フラグをオン
         isTransitioning = true;
         
+        // TargetGeneratorが存在するか確認
+        if (targetGenerator == null)
+        {
+            targetGenerator = FindObjectOfType<TargetGenerator>();
+            Debug.Log("GameClear内でTargetGeneratorを取得: " + (targetGenerator != null ? "成功" : "失敗"));
+        }
+        
         // 最終ステージかどうかをチェック
-        bool isFinalStage = (currentStage >= targetGenerator.stages.Length - 1);
+        bool isFinalStage = false;
+        
+        if (targetGenerator != null && targetGenerator.stages != null)
+        {
+            isFinalStage = (currentStage >= targetGenerator.stages.Length - 1);
+            Debug.Log($"ステージ状態: 現在={currentStage}, 最大={targetGenerator.stages.Length - 1}, 最終ステージ={isFinalStage}");
+        }
+        else
+        {
+            Debug.LogWarning("TargetGeneratorまたはステージ情報が見つかりません。最終ステージとして扱います。");
+            isFinalStage = true;
+        }
         
         if (isFinalStage)
         {
             // 最終ステージの場合は最終クリアパネルを表示
             if (gameClearPanel)
             {
+                Debug.Log("最終ステージクリア - GameClearPanelを表示します");
                 gameClearPanel.SetActive(true);
                 
                 // GameClearPanelコンポーネントがあれば初期化
@@ -319,12 +372,22 @@ public class GameManager : MonoBehaviour
                 if (clearPanelScript != null)
                 {
                     clearPanelScript.Initialize(currentScore);
+                    Debug.Log("GameClearPanelを初期化しました: スコア=" + currentScore);
                 }
+                else
+                {
+                    Debug.LogError("GameClearPanelにGameClearPanelコンポーネントがありません");
+                }
+            }
+            else
+            {
+                Debug.LogError("gameClearPanelの参照がnullです");
             }
         }
         else
         {
             // 通常のステージクリア時の処理
+            Debug.Log("通常ステージクリア - 次のステージに進みます");
             if (autoAdvanceStages && targetGenerator != null)
             {
                 // 新しいステージ遷移プロセスを開始

@@ -71,7 +71,7 @@ public class Target : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("GameManagerが見つかりません");
+                Debug.LogError("GameManagerが見つかりません - スコア加算ができませんでした");
             }
 
             // アニメーション再生
@@ -122,7 +122,7 @@ public class Target : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogError("Target.OnHit()でエラーが発生しました: " + e.Message);
+            Debug.LogError("Target.OnHit()でエラーが発生しました: " + e.Message + "\n" + e.StackTrace);
         }
     }
 
