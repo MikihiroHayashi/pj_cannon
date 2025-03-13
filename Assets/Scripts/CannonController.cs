@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
-// 大砲制御クラス - GameManagerから分離
+// 大砲制御クラス - Gravity Change Timing修正版
 public class CannonController : MonoBehaviour
 {
     [Header("大砲設定")]
@@ -26,9 +26,17 @@ public class CannonController : MonoBehaviour
     [Header("弾道パラメータ")]
     public CannonController.BallisticType ballisticType = BallisticType.Rotating; // 弾道タイプ
     public float curveFactor = 1.0f;     // カーブ係数
-    public float gravityChangeTiming = 1.0f; // 重力変化タイミング
-    public Vector3 windDirection = new Vector3(1f, 0f, 0f); // 風の方向
-    public float windStrength = 1.0f;    // 風の強さ
+    [Range(0.1f, 5.0f)]
+    public float gravityChangeTiming = 1.0f; // 重力変化タイミング（秒）
+    
+    [Header("重力設定")]
+    public float gravityStrength = 9.81f;    // 重力の強さ
+    [Range(-1.0f, 1.0f)]
+    public float gravityHorizontal = 0f;    // 水平方向の重力（-1.0～1.0）
+    [SerializeField] private Vector3 calculatedGravityDirection = Vector3.down; // 計算済み重力方向（表示用）
+    
+    [Header("弾道予測の詳細設定")]
+    public int simulationIterations = 10; // 1ステップあたりのシミュレーション反復回数
 
     [Header("UI参照")]
     public Slider powerSlider;           // パワーゲージ
@@ -38,7 +46,7 @@ public class CannonController : MonoBehaviour
     public LineRenderer trajectoryLine;  // 弾道予測線
     public int trajectorySteps = 30;     // 弾道計算のステップ数  
     public float trajectoryDistance = 10f; // 弾道予測の距離
-
+    
     private float currentPower;          // 現在の発射力
     private float horizontalAngle = 0f;  // 水平角度
     private float verticalAngle = 30f;   // 垂直角度
@@ -47,13 +55,14 @@ public class CannonController : MonoBehaviour
     private bool isAiming = true;        // 照準中フラグ（デフォルトでtrue）
     private Camera mainCamera;           // メインカメラ参照
     private float yAxisMultiplier = 1f;  // Y軸の方向乗数
+    private float lastGravityHorizontal; // 前回の水平重力値
 
     // 弾道タイプ
     public enum BallisticType
     {
         Rotating,       // 回転弾
         GravityChange,  // 重力変化弾
-        WindBased       // 風まかせ弾 
+        WindBased       // 不規則弾（旧: 風まかせ弾）
     }
 
     void Start()
@@ -82,15 +91,37 @@ public class CannonController : MonoBehaviour
         {
             fireButton.onClick.AddListener(FireCannon);
         }
+        
+        // 重力方向の初期化
+        lastGravityHorizontal = gravityHorizontal;
+        UpdateGravityDirection();
     }
 
     void Update()
     {
+        // インスペクターでの重力値変更をチェック
+        if (gravityHorizontal != lastGravityHorizontal)
+        {
+            UpdateGravityDirection();
+            lastGravityHorizontal = gravityHorizontal;
+        }
+        
         // マウス入力処理（Unityエディタやデスクトップでの操作用）
         HandleMouseInput();
         
         // 弾道予測表示を更新
         UpdateTrajectoryPreview();
+    }
+
+    // 重力方向を更新
+    void UpdateGravityDirection()
+    {
+        // 重力の基本方向と水平成分を組み合わせる
+        Vector3 baseDirection = Vector3.down;
+        Vector3 horizontalComponent = Vector3.right * gravityHorizontal;
+        
+        // 合成して方向ベクトルを計算（正規化）
+        calculatedGravityDirection = (baseDirection + horizontalComponent).normalized;
     }
 
     // マウス入力処理
@@ -157,21 +188,70 @@ public class CannonController : MonoBehaviour
         Vector3 fireDirection = muzzlePoint.forward;
         float power = currentPower;
 
-        // 弾道計算用の変数
-        Vector3 startPoint = muzzlePoint.position;
-        Vector3 initialVelocity = fireDirection * power;
-        Vector3 gravity = Physics.gravity;
-        float timeStep = trajectoryDistance / trajectorySteps;
-
         // 弾道ラインの頂点リストをクリア
         trajectoryLine.positionCount = trajectorySteps;
 
-        // 弾道計算のループ
+        // 弾道計算用の変数
+        Vector3 position = muzzlePoint.position;
+        Vector3 velocity = fireDirection * power;
+        float timeStep = 0.016f; // 通常の固定フレームレート (約60FPS)と同じステップ
+        float simulationTime = 0f;
+        bool gravityChanged = false;
+
+        // 各ステップでの位置を計算
         for (int i = 0; i < trajectorySteps; i++)
         {
-            float time = i * timeStep;
-            Vector3 nextPoint = startPoint + initialVelocity * time + 0.5f * gravity * time * time;
-            trajectoryLine.SetPosition(i, nextPoint);
+            // 現在の位置を軌道上の点として設定
+            trajectoryLine.SetPosition(i, position);
+            
+            // シミュレーション時間をインクリメント
+            simulationTime += timeStep;
+            
+            // 弾丸タイプに応じて速度変化を計算
+            // カスタム重力を適用
+            Vector3 gravityForce = calculatedGravityDirection * gravityStrength;
+            
+            switch (ballisticType)
+            {
+                case BallisticType.Rotating:
+                    // 回転弾の動き（マグナス効果）
+                    Vector3 rotationForce = Vector3.Cross(velocity.normalized, Vector3.up) * curveFactor;
+                    velocity += gravityForce * timeStep; // カスタム重力
+                    velocity += rotationForce * timeStep;
+                    break;
+
+                case BallisticType.GravityChange:
+                    // 重力変化弾の動き
+                    if (simulationTime >= gravityChangeTiming && !gravityChanged)
+                    {
+                        // 重力の影響を急激に変化
+                        velocity += Vector3.up * curveFactor * 10f;
+                        gravityChanged = true;
+                    }
+                    velocity += gravityForce * timeStep; // カスタム重力
+                    break;
+
+                case BallisticType.WindBased:
+                    // 不規則な軌道（旧: 風まかせ弾）
+                    float noiseValue = Mathf.PerlinNoise(simulationTime * 2f, 0f) * 2f - 1f;
+                    Vector3 randomForce = new Vector3(
+                        Mathf.PerlinNoise(simulationTime * 3f, 0) * 2f - 1f,
+                        Mathf.PerlinNoise(simulationTime * 3f, 1) * 2f - 1f,
+                        Mathf.PerlinNoise(simulationTime * 3f, 2) * 2f - 1f
+                    ).normalized * curveFactor * noiseValue;
+                    
+                    velocity += gravityForce * timeStep; // カスタム重力
+                    velocity += randomForce * timeStep;
+                    break;
+                    
+                default:
+                    // デフォルトは通常の放物線（カスタム重力使用）
+                    velocity += gravityForce * timeStep;
+                    break;
+            }
+
+            // 次の位置を計算
+            position += velocity * timeStep;
         }
     }
 
@@ -232,9 +312,6 @@ public class CannonController : MonoBehaviour
         
         // 垂直方向の回転（X軸周り）
         verticalPivot.localRotation = Quaternion.Euler(-verticalAngle, 0, 0);
-
-        // 開発中は角度をコンソールに表示（デバッグ用）
-        Debug.Log($"大砲角度: 水平={horizontalAngle}, 垂直={verticalAngle}");
     }
 
     // 大砲を発射（外部からも呼び出せるようにpublic）
@@ -262,8 +339,13 @@ public class CannonController : MonoBehaviour
         Cannonball ballScript = cannonball.GetComponent<Cannonball>();
         if (ballScript != null)
         {
+            // 重力方向と強さを設定
             ballScript.Initialize(fireDirection, currentPower, ballisticType, curveFactor, 
-                                 gravityChangeTiming, windDirection, windStrength);
+                                 gravityChangeTiming, calculatedGravityDirection, gravityStrength);
+            
+            // デバッグ - パラメータ出力
+            Debug.Log($"砲弾パラメータ: タイプ={ballisticType}, カーブ係数={curveFactor}, " +
+                     $"重力変化タイミング={gravityChangeTiming}秒");
         }
 
         // 発射エフェクト
@@ -284,7 +366,6 @@ public class CannonController : MonoBehaviour
                 EffectAutoDestroy effectScript = effect.AddComponent<EffectAutoDestroy>();
                 effectScript.useParticleSystemDuration = true;
                 effectScript.useAudioLength = true;
-                Debug.Log("発射エフェクトに自動削除コンポーネントを追加しました");
             }
         }
 
@@ -321,7 +402,9 @@ public class CannonController : MonoBehaviour
         return $"水平角度: {horizontalAngle:F1}°\n" +
                $"垂直角度: {verticalAngle:F1}°\n" + 
                $"発射力: {currentPower:F1}\n" +
-               $"弾道タイプ: {ballisticType}";
+               $"弾道タイプ: {ballisticType}\n" +
+               $"重力変化タイミング: {gravityChangeTiming}秒\n" +
+               $"水平重力: {gravityHorizontal:F2}";
     }
     
     // 大砲を初期状態にリセット
@@ -342,7 +425,5 @@ public class CannonController : MonoBehaviour
         
         // 大砲の向きを更新
         UpdateCannonRotation();
-        
-        Debug.Log("大砲をリセットしました");
     }
 }

@@ -1488,7 +1488,7 @@ Transform:
   m_GameObject: {fileID: 344473067}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -1.77}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4502,11 +4502,13 @@ MonoBehaviour:
   powerMin: 10
   powerMax: 30
   invertYAxis: 0
-  ballisticType: 0
+  ballisticType: 2
   curveFactor: 0
   gravityChangeTiming: 0
-  windDirection: {x: 0, y: 0, z: 0}
-  windStrength: 0
+  gravityStrength: 9.81
+  gravityHorizontal: 0
+  calculatedGravityDirection: {x: 0, y: 0, z: 0}
+  simulationIterations: 10
   powerSlider: {fileID: 315749257}
   fireButton: {fileID: 878607941}
   trajectoryLine: {fileID: 344473068}
