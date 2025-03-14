@@ -39,12 +39,19 @@ public class TargetGenerator : MonoBehaviour
     {
         return generatedTargets.Count;
     }
-    
+
     // 現在のステージを初期化
     public void InitializeCurrentStage()
     {
         Debug.Log($"TargetGenerator.InitializeCurrentStage() 呼び出し - ステージ:{currentStage}, 初回初期化:{isFirstInitialization}");
-        
+
+        // ステージのインデックス範囲チェック（重要）
+        if (currentStage < 0 || stageConfigs == null || currentStage >= stageConfigs.Length)
+        {
+            Debug.LogError($"無効なステージインデックス: {currentStage}, 設定数: {(stageConfigs != null ? stageConfigs.Length : 0)}");
+            currentStage = 0; // 安全なフォールバック
+        }
+
         // ステージ設定を事前に確認
         StageConfigSO config = GetCurrentStageConfig();
         if (config != null)
@@ -53,13 +60,10 @@ public class TargetGenerator : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"ステージ設定の取得に失敗しました: ステージインデックス={currentStage}");
-            return; // 設定がない場合は中断
-        }
-        
-        // 重要な変更: GameManagerからRestart時は必ず再生成するように修正
-        // 既存のターゲットがあれば常にクリア
-        if (generatedTargets.Count > 0)
+
+            // 重要な変更: GameManagerからRestart時は必ず再生成するように修正
+            // 既存のターゲットがあれば常にクリア
+            if (generatedTargets.Count > 0)
         {
             Debug.Log($"既存のターゲット {generatedTargets.Count} 個をクリアします");
             ClearTargets();
