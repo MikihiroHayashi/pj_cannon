@@ -2,47 +2,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// ターゲット生成クラス - スポーンエリア対応版
+// ターゲット生成クラス - ScriptableObject対応版
 public class TargetGenerator : MonoBehaviour
 {
-    [System.Serializable]
-    public class StageConfig
-    {
-        [Header("基本設定")]
-        public string stageName = "Stage 1";       // ステージ名
-        public bool isUnlocked = true;             // ステージがアンロックされているか
-        
-        [Header("ゲーム条件")]
-        public int targetCount = 5;                // 生成するターゲット数
-        public int requiredTargetsToDestroy = 3;   // クリアに必要な破壊ターゲット数
-        public float timeLimit = 180f;             // 制限時間（秒）
-        public int shotLimit = 5;                  // 発射可能回数
-        
-        [Header("ターゲット設定")]
-        public GameObject[] stageTargetPrefabs;    // このステージで使用するターゲットプレハブ（未設定時は共通プレハブを使用）
-        public Vector2 scoreRange = new Vector2(50, 200); // スコア範囲（最小、最大）
-        
-        [Header("配置設定")]
-        public SpawnArea spawnArea;                // このステージで使用するスポーンエリア
-        public Vector2 heightRange = new Vector2(1f, 10f);  // 高さ範囲（最小、最大）
-        public bool useRandomRotation = true;      // ランダム回転を使用するか
-        public bool allowOverlap = false;          // ターゲット同士の重なりを許可するか
-        public float minTargetDistance = 2f;       // ターゲット間の最小距離
-        
-        [Header("特殊ギミック")]
-        public bool enableWind = false;            // 風の影響を有効にするか
-        public float windStrength = 1.0f;          // 風の強さ
-        public bool enableMovingTargets = false;   // 動くターゲットを有効にするか
-        public float movingTargetSpeed = 1.0f;     // 動くターゲットの速度
-        public bool distributeTargetsEvenly = true; // ターゲットを均等に分布させるか
-    }
-
     [Header("ターゲット設定")]
     public GameObject[] targetPrefabs;             // ターゲットのプレハブ配列
     public Transform targetParent;                 // 生成したターゲットの親オブジェクト
     
     [Header("ステージ設定")]
-    public StageConfig[] stages;                   // ステージ設定の配列
+    public StageCollectionSO stageCollection;      // ScriptableObjectによるステージコレクション
     public int currentStage = 0;                   // 現在のステージインデックス
     
     [Header("生成設定")]
@@ -58,6 +26,12 @@ public class TargetGenerator : MonoBehaviour
     {
         // Start内では特に何もしない - GameManagerから初期化を行う
         Debug.Log("TargetGenerator.Start() 呼び出し - 初期生成はGameManagerから実行されます");
+        
+        // ステージコレクションの有無をチェック
+        if (stageCollection == null)
+        {
+            Debug.LogError("StageCollectionが設定されていません。ゲームが正常に動作しない可能性があります。");
+        }
     }
     
     // 現在のステージが初期化済みかどうかを確認
@@ -76,6 +50,20 @@ public class TargetGenerator : MonoBehaviour
     public void InitializeCurrentStage()
     {
         Debug.Log($"TargetGenerator.InitializeCurrentStage() 呼び出し - ステージ:{currentStage}, 初回初期化:{isFirstInitialization}");
+        
+        // StageCollectionのチェック
+        if (stageCollection == null)
+        {
+            Debug.LogError("StageCollectionが設定されていません");
+            return;
+        }
+        
+        // ステージが範囲内かチェック
+        if (currentStage < 0 || currentStage >= stageCollection.StageCount)
+        {
+            Debug.LogError($"ステージインデックスが範囲外です: {currentStage}, 有効範囲: 0-{stageCollection.StageCount - 1}");
+            currentStage = 0; // 範囲外の場合は最初のステージにリセット
+        }
         
         // 初回初期化時または初期化されていないステージの場合のみターゲットを生成
         if (isFirstInitialization || !IsStageInitialized(currentStage))
@@ -149,17 +137,30 @@ public class TargetGenerator : MonoBehaviour
     // 指定したステージのターゲットを生成
     public void GenerateTargetsForStage(int stageIndex)
     {
-        if (stageIndex < 0 || stageIndex >= stages.Length)
+        if (stageCollection == null)
+        {
+            Debug.LogError("StageCollectionが設定されていません");
+            return;
+        }
+        
+        if (stageIndex < 0 || stageIndex >= stageCollection.StageCount)
         {
             Debug.LogError($"指定されたステージインデックス {stageIndex} が範囲外です");
             return;
         }
         
-        StageConfig stage = stages[stageIndex];
-        Debug.Log($"ステージ {stage.stageName} のターゲットを生成します。数: {stage.targetCount}");
+        // ステージ設定を取得
+        StageConfigSO stageConfig = stageCollection.GetStage(stageIndex);
+        if (stageConfig == null)
+        {
+            Debug.LogError($"ステージ {stageIndex} の設定が取得できませんでした");
+            return;
+        }
+        
+        Debug.Log($"ステージ {stageConfig.stageName} のターゲットを生成します。数: {stageConfig.targetCount}");
         
         // スポーンエリアを決定
-        SpawnArea spawnArea = stage.spawnArea != null ? stage.spawnArea : defaultSpawnArea;
+        SpawnArea spawnArea = stageConfig.spawnArea != null ? stageConfig.spawnArea : defaultSpawnArea;
         
         // スポーンエリアがない場合はエラー
         if (spawnArea == null)
@@ -172,7 +173,7 @@ public class TargetGenerator : MonoBehaviour
         List<Vector3> placedPositions = new List<Vector3>();
         
         // ターゲット数分繰り返し
-        for (int i = 0; i < stage.targetCount; i++)
+        for (int i = 0; i < stageConfig.targetCount; i++)
         {
             // 配置を試行
             int attempts = 0;
@@ -182,24 +183,24 @@ public class TargetGenerator : MonoBehaviour
             while (!placementSuccessful && attempts < maxPlacementAttempts)
             {
                 // ターゲットの位置を決定
-                if (stage.distributeTargetsEvenly && stage.targetCount > 1)
+                if (stageConfig.distributeTargetsEvenly && stageConfig.targetCount > 1)
                 {
                     // エリアを均等に分割してターゲットを配置
-                    spawnPos = GetEvenlyDistributedPosition(spawnArea, i, stage.targetCount, stage.heightRange);
+                    spawnPos = GetEvenlyDistributedPosition(spawnArea, i, stageConfig.targetCount, stageConfig.heightRange);
                 }
                 else
                 {
                     // ランダムな位置を取得
-                    spawnPos = GetRandomPositionInArea(spawnArea, stage.heightRange);
+                    spawnPos = GetRandomPositionInArea(spawnArea, stageConfig.heightRange);
                 }
                 
                 // 他のターゲットとの距離を確認
                 bool tooClose = false;
-                if (!stage.allowOverlap)
+                if (!stageConfig.allowOverlap)
                 {
                     foreach (Vector3 pos in placedPositions)
                     {
-                        if (Vector3.Distance(pos, spawnPos) < stage.minTargetDistance)
+                        if (Vector3.Distance(pos, spawnPos) < stageConfig.minTargetDistance)
                         {
                             tooClose = true;
                             break;
@@ -226,9 +227,9 @@ public class TargetGenerator : MonoBehaviour
                 GameObject targetPrefab;
                 
                 // ステージ固有のターゲットプレハブがあれば使用、なければ共通プレハブから選択
-                if (stage.stageTargetPrefabs != null && stage.stageTargetPrefabs.Length > 0)
+                if (stageConfig.stageTargetPrefabs != null && stageConfig.stageTargetPrefabs.Length > 0)
                 {
-                    targetPrefab = stage.stageTargetPrefabs[Random.Range(0, stage.stageTargetPrefabs.Length)];
+                    targetPrefab = stageConfig.stageTargetPrefabs[Random.Range(0, stageConfig.stageTargetPrefabs.Length)];
                 }
                 else
                 {
@@ -239,7 +240,7 @@ public class TargetGenerator : MonoBehaviour
                 GameObject target = Instantiate(targetPrefab, spawnPos, Quaternion.identity);
                 
                 // ランダム回転を適用
-                if (stage.useRandomRotation)
+                if (stageConfig.useRandomRotation)
                 {
                     target.transform.rotation = Random.rotation;
                 }
@@ -265,12 +266,12 @@ public class TargetGenerator : MonoBehaviour
                 }
                 
                 // ターゲットのスコア値をステージ設定に基づいてランダム化
-                targetComponent.scoreValue = Random.Range((int)stage.scoreRange.x, (int)stage.scoreRange.y + 1);
+                targetComponent.scoreValue = Random.Range((int)stageConfig.scoreRange.x, (int)stageConfig.scoreRange.y + 1);
                 
                 // 移動するターゲットの設定
-                if (stage.enableMovingTargets)
+                if (stageConfig.enableMovingTargets)
                 {
-                    SetupMovingTarget(target, stage.movingTargetSpeed);
+                    SetupMovingTarget(target, stageConfig.movingTargetSpeed);
                 }
                 
                 // 生成したターゲットをリストに追加
@@ -285,9 +286,9 @@ public class TargetGenerator : MonoBehaviour
         }
         
         // ステージの風設定を適用
-        ApplyWindSettings(stage);
+        ApplyWindSettings(stageConfig);
         
-        Debug.Log($"ターゲット生成完了: 成功={generatedTargets.Count}, 要求={stage.targetCount}");
+        Debug.Log($"ターゲット生成完了: 成功={generatedTargets.Count}, 要求={stageConfig.targetCount}");
     }
     
     // エリア内のランダムな位置を取得
@@ -361,9 +362,9 @@ public class TargetGenerator : MonoBehaviour
     }
     
     // 風の設定を適用
-    private void ApplyWindSettings(StageConfig stage)
+    private void ApplyWindSettings(StageConfigSO stageConfig)
     {
-        if (stage.enableWind)
+        if (stageConfig.enableWind)
         {
             // 既存の風エリアを検索し、なければ作成
             WindArea[] windAreas = FindObjectsOfType<WindArea>();
@@ -376,16 +377,16 @@ public class TargetGenerator : MonoBehaviour
                 // 風の方向をランダムに設定
                 Vector3 randomDir = new Vector3(Random.Range(-1f, 1f), 0, Random.Range(-1f, 1f)).normalized;
                 windArea.windDirection = randomDir;
-                windArea.windStrength = stage.windStrength;
+                windArea.windStrength = stageConfig.windStrength;
                 
-                Debug.Log($"ステージ用の風エリアを作成しました。強さ: {stage.windStrength}");
+                Debug.Log($"ステージ用の風エリアを作成しました。強さ: {stageConfig.windStrength}");
             }
             else
             {
                 // 既存の風エリアを更新
                 foreach (WindArea area in windAreas)
                 {
-                    area.windStrength = stage.windStrength;
+                    area.windStrength = stageConfig.windStrength;
                     // ランダムな方向に変更（オプション）
                     if (Random.value > 0.5f)
                     {
@@ -393,7 +394,7 @@ public class TargetGenerator : MonoBehaviour
                         area.windDirection = randomDir;
                     }
                 }
-                Debug.Log($"既存の風エリアを更新しました。強さ: {stage.windStrength}");
+                Debug.Log($"既存の風エリアを更新しました。強さ: {stageConfig.windStrength}");
             }
         }
         else
@@ -410,48 +411,57 @@ public class TargetGenerator : MonoBehaviour
     // GameManagerのステージ設定を更新
     private void UpdateGameManagerStageSettings()
     {
-        if (GameManager.Instance != null)
+        if (GameManager.Instance != null && stageCollection != null)
         {
-            StageConfig currentStageConfig = GetCurrentStageConfig();
+            // 現在のステージ設定を取得
+            StageConfigSO stageConfig = GetCurrentStageConfig();
+            if (stageConfig == null) return;
             
             // ターゲット数の更新
             GameManager.Instance.targetCount = generatedTargets.Count;
             
             // ステージ設定の適用
-            GameManager.Instance.requiredTargetsToDestroy = currentStageConfig.requiredTargetsToDestroy;
-            GameManager.Instance.gameTime = currentStageConfig.timeLimit;
-            GameManager.Instance.shotLimit = currentStageConfig.shotLimit;
-            GameManager.Instance.remainingTime = currentStageConfig.timeLimit;
+            GameManager.Instance.requiredTargetsToDestroy = stageConfig.requiredTargetsToDestroy;
+            GameManager.Instance.gameTime = stageConfig.timeLimit;
+            GameManager.Instance.shotLimit = stageConfig.shotLimit;
+            GameManager.Instance.remainingTime = stageConfig.timeLimit;
             
             // ゲームマネージャーのUI更新
             GameManager.Instance.UpdateUI();
             
             Debug.Log($"GameManagerのステージ設定を更新しました: " +
                       $"ターゲット数={generatedTargets.Count}, " +
-                      $"クリア条件={currentStageConfig.requiredTargetsToDestroy}, " +
-                      $"制限時間={currentStageConfig.timeLimit}秒, " +
-                      $"発射可能数={currentStageConfig.shotLimit}");
+                      $"クリア条件={stageConfig.requiredTargetsToDestroy}, " +
+                      $"制限時間={stageConfig.timeLimit}秒, " +
+                      $"発射可能数={stageConfig.shotLimit}");
         }
         else
         {
-            Debug.LogWarning("GameManagerが見つかりません");
+            Debug.LogWarning("GameManagerが見つかりません、またはStageCollectionが設定されていません");
         }
     }
     
     // 次のステージに進む
     public void NextStage()
     {
+        if (stageCollection == null)
+        {
+            Debug.LogError("StageCollectionが設定されていません");
+            return;
+        }
+        
         currentStage++;
         
         // ステージがループするか確認
-        if (currentStage >= stages.Length)
+        if (currentStage >= stageCollection.StageCount)
         {
             currentStage = 0;
             Debug.Log("最後のステージが完了しました。ステージ0に戻ります。");
         }
         
         // 次のステージが解放されているか確認
-        if (!stages[currentStage].isUnlocked)
+        StageConfigSO nextStage = stageCollection.GetStage(currentStage);
+        if (nextStage != null && !nextStage.isUnlocked)
         {
             Debug.Log($"ステージ {currentStage} はまだロックされています。");
             return;
@@ -498,33 +508,45 @@ public class TargetGenerator : MonoBehaviour
     }
     
     // ステージ設定を取得
-    public StageConfig GetCurrentStageConfig()
+    public StageConfigSO GetCurrentStageConfig()
     {
-        if (currentStage < 0 || currentStage >= stages.Length)
+        if (stageCollection == null)
+        {
+            Debug.LogError("StageCollectionが設定されていません");
+            return null;
+        }
+        
+        if (currentStage < 0 || currentStage >= stageCollection.StageCount)
         {
             Debug.LogError("現在のステージインデックスが範囲外です");
             return null;
         }
         
-        return stages[currentStage];
+        return stageCollection.GetStage(currentStage);
+    }
+    
+    // ステージ数を取得
+    public int GetStageCount()
+    {
+        return stageCollection != null ? stageCollection.StageCount : 0;
     }
     
     // エディタ上での表示
     private void OnDrawGizmos()
     {
         // 選択中のステージのスポーンエリアをハイライト
-        if (stages != null && stages.Length > 0 && Application.isEditor && !Application.isPlaying)
+        if (stageCollection != null && stageCollection.StageCount > 0 && Application.isEditor && !Application.isPlaying)
         {
-            int stageToDisplay = Mathf.Clamp(currentStage, 0, stages.Length - 1);
-            StageConfig stage = stages[stageToDisplay];
+            int stageToDisplay = Mathf.Clamp(currentStage, 0, stageCollection.StageCount - 1);
+            StageConfigSO stageConfig = stageCollection.GetStage(stageToDisplay);
             
-            if (stage != null && stage.spawnArea != null)
+            if (stageConfig != null && stageConfig.spawnArea != null)
             {
                 // ステージ名を表示
                 Gizmos.color = Color.white;
                 #if UNITY_EDITOR
-                UnityEditor.Handles.Label(stage.spawnArea.transform.position + Vector3.up * stage.spawnArea.areaSize.y * 0.5f, 
-                                          $"Stage {stageToDisplay}: {stage.stageName}");
+                UnityEditor.Handles.Label(stageConfig.spawnArea.transform.position + Vector3.up * stageConfig.spawnArea.areaSize.y * 0.5f, 
+                                          $"Stage {stageToDisplay}: {stageConfig.stageName}");
                 #endif
             }
         }

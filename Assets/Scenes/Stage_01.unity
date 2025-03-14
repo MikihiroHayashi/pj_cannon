@@ -169,45 +169,7 @@ MonoBehaviour:
   targetPrefabs:
   - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
   targetParent: {fileID: 48599630}
-  stages:
-  - stageName: Stage 001
-    isUnlocked: 0
-    targetCount: 2
-    requiredTargetsToDestroy: 2
-    timeLimit: 60
-    shotLimit: 100
-    stageTargetPrefabs:
-    - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
-    scoreRange: {x: 100, y: 100}
-    spawnArea: {fileID: 1815152132}
-    heightRange: {x: -5, y: 2}
-    useRandomRotation: 0
-    allowOverlap: 0
-    minTargetDistance: 0
-    enableWind: 0
-    windStrength: 0
-    enableMovingTargets: 0
-    movingTargetSpeed: 0
-    distributeTargetsEvenly: 0
-  - stageName: Stage 002
-    isUnlocked: 0
-    targetCount: 1
-    requiredTargetsToDestroy: 1
-    timeLimit: 60
-    shotLimit: 100
-    stageTargetPrefabs:
-    - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
-    scoreRange: {x: 100, y: 100}
-    spawnArea: {fileID: 1815152132}
-    heightRange: {x: -5, y: 2}
-    useRandomRotation: 0
-    allowOverlap: 0
-    minTargetDistance: 0
-    enableWind: 0
-    windStrength: 0
-    enableMovingTargets: 0
-    movingTargetSpeed: 0
-    distributeTargetsEvenly: 0
+  stageCollection: {fileID: 11400000, guid: cd888f3c0a9e6a643b3c45bc4fcbc1a4, type: 2}
   currentStage: 0
   defaultSpawnArea: {fileID: 1815152132}
   obstacleLayer:

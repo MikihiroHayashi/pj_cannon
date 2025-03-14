@@ -7,7 +7,7 @@ using TMPro;
 using UnityEditor;
 #endif
 
-// ゲームマネージャー - ステージ管理機能追加版
+// ゲームマネージャー - ScriptableObject対応版
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -43,7 +43,7 @@ public class GameManager : MonoBehaviour
 
     // 内部変数
     private int currentScore = 0;           // 現在のスコア
-    internal int destroyedTargets = 0;       // 破壊したターゲット数 (privateからinternalに変更)
+    internal int destroyedTargets = 0;      // 破壊したターゲット数 (privateからinternalに変更)
     internal int remainingShots;            // 残り発射数 
     internal float remainingTime;           // 残り時間
     private TargetGenerator targetGenerator; // ターゲット生成クラス参照
@@ -72,6 +72,13 @@ public class GameManager : MonoBehaviour
         if (targetGenerator == null)
         {
             Debug.LogError("TargetGeneratorが見つかりません。ゲーム機能が制限されます。");
+        }
+        else
+        {
+            // 必ずステージ0から始まるようにする
+            currentStage = 0;
+            targetGenerator.currentStage = 0;
+            Debug.Log("ゲーム開始時にステージを0に設定しました");
         }
         
         // GameClearPanelの確認
@@ -111,15 +118,21 @@ public class GameManager : MonoBehaviour
             targetGenerator.currentStage = currentStage;
             
             // ステージ設定を取得
-            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
-            if (config != null)
+            StageConfigSO stageConfig = targetGenerator.GetCurrentStageConfig();
+            if (stageConfig != null)
             {
                 // ステージ設定から値を設定
-                shotLimit = config.shotLimit;
-                gameTime = config.timeLimit;
-                requiredTargetsToDestroy = config.requiredTargetsToDestroy;
+                shotLimit = stageConfig.shotLimit;
+                gameTime = stageConfig.timeLimit;
+                requiredTargetsToDestroy = stageConfig.requiredTargetsToDestroy;
                 
                 Debug.Log($"ステージ設定をロード: ショット数={shotLimit}, 時間={gameTime}, 必要ターゲット数={requiredTargetsToDestroy}");
+                
+                // ステージ名を表示
+                if (stageNameText != null)
+                {
+                    stageNameText.text = stageConfig.stageName;
+                }
             }
             
             // 既に初期化済みでない場合のみターゲットを生成
@@ -136,12 +149,6 @@ public class GameManager : MonoBehaviour
             {
                 requiredTargetsToDestroy = targetCount;
                 Debug.Log($"クリア条件を修正: 全ターゲット破壊に設定 ({requiredTargetsToDestroy})");
-            }
-            
-            // ステージ名を表示
-            if (stageNameText != null)
-            {
-                stageNameText.text = config.stageName;
             }
         }
         else
@@ -348,10 +355,11 @@ public class GameManager : MonoBehaviour
         // 最終ステージかどうかをチェック
         bool isFinalStage = false;
         
-        if (targetGenerator != null && targetGenerator.stages != null)
+        if (targetGenerator != null)
         {
-            isFinalStage = (currentStage >= targetGenerator.stages.Length - 1);
-            Debug.Log($"ステージ状態: 現在={currentStage}, 最大={targetGenerator.stages.Length - 1}, 最終ステージ={isFinalStage}");
+            // ScriptableObject版では、TargetGenerator.GetStageCount()を使用
+            isFinalStage = (currentStage >= targetGenerator.GetStageCount() - 1);
+            Debug.Log($"ステージ状態: 現在={currentStage}, 最大={targetGenerator.GetStageCount() - 1}, 最終ステージ={isFinalStage}");
         }
         else
         {
@@ -378,6 +386,14 @@ public class GameManager : MonoBehaviour
                 {
                     Debug.LogError("GameClearPanelにGameClearPanelコンポーネントがありません");
                 }
+                
+                // ステージを0にリセット（最終ステージクリア後）
+                currentStage = 0;
+                if (targetGenerator != null)
+                {
+                    targetGenerator.currentStage = 0;
+                }
+                Debug.Log("最終ステージクリア後、ステージを0にリセットしました");
             }
             else
             {
@@ -436,7 +452,7 @@ public class GameManager : MonoBehaviour
         isTransitioning = false;
     }
     
-    // ステージ開始表示のコルーチン
+    // ステージ開始表示のコルーチン - ScriptableObject対応版
     private IEnumerator ShowStageStart(int stageIndex)
     {
         if (stageStartUI && stageStartText)
@@ -445,10 +461,10 @@ public class GameManager : MonoBehaviour
             string stageName = "STAGE " + (stageIndex + 1);
             if (targetGenerator != null)
             {
-                TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
-                if (config != null && !string.IsNullOrEmpty(config.stageName))
+                StageConfigSO stageConfig = targetGenerator.GetCurrentStageConfig();
+                if (stageConfig != null && !string.IsNullOrEmpty(stageConfig.stageName))
                 {
-                    stageName = config.stageName.ToUpper();
+                    stageName = stageConfig.stageName.ToUpper();
                 }
             }
             
@@ -474,18 +490,18 @@ public class GameManager : MonoBehaviour
         // ステージ設定を取得
         if (targetGenerator != null)
         {
-            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
-            if (config != null)
+            StageConfigSO stageConfig = targetGenerator.GetCurrentStageConfig();
+            if (stageConfig != null)
             {
                 // ステージ設定からパラメータを更新
-                shotLimit = config.shotLimit;
-                gameTime = config.timeLimit;
-                requiredTargetsToDestroy = config.requiredTargetsToDestroy;
+                shotLimit = stageConfig.shotLimit;
+                gameTime = stageConfig.timeLimit;
+                requiredTargetsToDestroy = stageConfig.requiredTargetsToDestroy;
                 
                 // ステージ名を更新
                 if (stageNameText != null)
                 {
-                    stageNameText.text = config.stageName;
+                    stageNameText.text = stageConfig.stageName;
                 }
             }
         }
@@ -526,6 +542,9 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("ゲームリスタート（その場）");
         
+        // ステージを0に戻す
+        currentStage = 0;
+        
         // スコアリセット
         currentScore = 0;
         destroyedTargets = 0;
@@ -537,6 +556,11 @@ public class GameManager : MonoBehaviour
         remainingTime = gameTime;
         
         // ターゲットの再生成・再設定
+        // TargetGeneratorにも現在のステージ情報を渡す
+        if (targetGenerator != null)
+        {
+            targetGenerator.currentStage = currentStage;
+        }
         ResetTargets();
         
         // 大砲の位置・角度リセット
@@ -628,7 +652,7 @@ public class GameManager : MonoBehaviour
         RestartGameInPlace();
     }
     
-    // 特定のステージにジャンプ
+    // 特定のステージにジャンプ - ScriptableObject対応版
     public void JumpToStage(int stageIndex)
     {
         if (targetGenerator == null)
@@ -638,14 +662,15 @@ public class GameManager : MonoBehaviour
         }
         
         // ステージ範囲チェック
-        if (stageIndex < 0 || stageIndex >= targetGenerator.stages.Length)
+        if (stageIndex < 0 || stageIndex >= targetGenerator.GetStageCount())
         {
             Debug.LogError($"無効なステージインデックス: {stageIndex}");
             return;
         }
         
         // ステージが解放されているかチェック
-        if (!targetGenerator.stages[stageIndex].isUnlocked)
+        StageConfigSO stageConfig = targetGenerator.GetCurrentStageConfig();
+        if (stageConfig != null && !stageConfig.isUnlocked)
         {
             Debug.LogWarning($"ステージ {stageIndex} はまだロックされています。");
             return;

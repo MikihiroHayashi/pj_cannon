@@ -74,12 +74,12 @@ public class GameClearPanel : MonoBehaviour
             }
         }
     }
-    
+
     // リスタートボタンクリック時
     private void OnRestartButtonClicked()
     {
         Debug.Log("リスタートボタンがクリックされました");
-        
+
         if (gameManager != null)
         {
             // その場でリスタート（シーンリロードなし）
@@ -90,7 +90,7 @@ public class GameClearPanel : MonoBehaviour
             Debug.LogError("GameManagerが見つかりません");
         }
     }
-    
+
     // ホームボタンクリック時
     private void OnHomeButtonClicked()
     {
