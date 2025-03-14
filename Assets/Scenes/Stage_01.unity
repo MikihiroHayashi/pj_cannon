@@ -169,9 +169,45 @@ MonoBehaviour:
   targetPrefabs:
   - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
   targetParent: {fileID: 48599630}
-  stageConfigs:
-  - {fileID: 11400000, guid: 4301bad117148274eabe6af42df546f1, type: 2}
-  - {fileID: 11400000, guid: 873f492a341fef7489f72b49cbd03092, type: 2}
+  stages:
+  - stageName: Stage 001
+    isUnlocked: 0
+    targetCount: 2
+    requiredTargetsToDestroy: 2
+    timeLimit: 60
+    shotLimit: 100
+    stageTargetPrefabs:
+    - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
+    scoreRange: {x: 100, y: 100}
+    spawnArea: {fileID: 1815152132}
+    heightRange: {x: -5, y: 2}
+    useRandomRotation: 0
+    allowOverlap: 0
+    minTargetDistance: 0
+    enableWind: 0
+    windStrength: 0
+    enableMovingTargets: 0
+    movingTargetSpeed: 0
+    distributeTargetsEvenly: 0
+  - stageName: Stage 002
+    isUnlocked: 0
+    targetCount: 1
+    requiredTargetsToDestroy: 1
+    timeLimit: 60
+    shotLimit: 100
+    stageTargetPrefabs:
+    - {fileID: 6589048845479497798, guid: 9cf72f9556b4c774da8806add72a3273, type: 3}
+    scoreRange: {x: 100, y: 100}
+    spawnArea: {fileID: 1815152132}
+    heightRange: {x: -5, y: 2}
+    useRandomRotation: 0
+    allowOverlap: 0
+    minTargetDistance: 0
+    enableWind: 0
+    windStrength: 0
+    enableMovingTargets: 0
+    movingTargetSpeed: 0
+    distributeTargetsEvenly: 0
   currentStage: 0
   defaultSpawnArea: {fileID: 1815152132}
   obstacleLayer:
@@ -409,7 +445,6 @@ MonoBehaviour:
   homeButton: {fileID: 1093547366}
   finalScoreText: {fileID: 1220079104}
   highScoreText: {fileID: 2085915200}
-  homeSceneName: Title
 --- !u!1 &104520420
 GameObject:
   m_ObjectHideFlags: 0
@@ -444,7 +479,20 @@ MonoBehaviour:
   targetCount: 0
   requiredTargetsToDestroy: 0
   currentStage: 0
+  stageNameText: {fileID: 0}
   autoAdvanceStages: 1
+  scoreText: {fileID: 1585530421}
+  shotText: {fileID: 0}
+  timeText: {fileID: 1482023207}
+  targetCountText: {fileID: 0}
+  timerSlider: {fileID: 224582306}
+  timerBar: {fileID: 0}
+  gameOverPanel: {fileID: 995862535}
+  gameClearPanel: {fileID: 91418143}
+  stageClearUI: {fileID: 342423465}
+  stageClearText: {fileID: 724883643}
+  stageStartUI: {fileID: 1920760536}
+  stageStartText: {fileID: 1915954700}
   stageClearDisplayTime: 2
   stageStartDisplayTime: 1
 --- !u!4 &104520422
@@ -2651,7 +2699,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: HighScore
+  m_text: 'SCORE: 0'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3865,63 +3913,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2028452064}
   m_CullTransparentMesh: 1
---- !u!1 &2033644097
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2033644099}
-  - component: {fileID: 2033644098}
-  m_Layer: 0
-  m_Name: UIManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2033644098
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2033644097}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9464d085c78d21741bf33cfe32263a15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  scoreText: {fileID: 1585530421}
-  shotText: {fileID: 0}
-  timeText: {fileID: 1482023207}
-  targetCountText: {fileID: 0}
-  timerSlider: {fileID: 224582306}
-  timerBar: {fileID: 0}
-  gameOverPanel: {fileID: 995862535}
-  gameClearPanel: {fileID: 91418143}
-  stageClearUI: {fileID: 342423465}
-  stageClearText: {fileID: 724883643}
-  stageStartUI: {fileID: 1920760536}
-  stageStartText: {fileID: 1915954700}
-  stageNameText: {fileID: 0}
---- !u!4 &2033644099
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2033644097}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2051624965
 GameObject:
   m_ObjectHideFlags: 0
@@ -4035,7 +4026,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: HighScore
+  m_text: 'HIGH SCORE: 1833'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4062,7 +4053,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 80
+  m_fontSize: 58.7
   m_fontSizeBase: 80
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -4778,4 +4769,3 @@ SceneRoots:
   - {fileID: 48599630}
   - {fileID: 234943659}
   - {fileID: 104520422}
-  - {fileID: 2033644099}

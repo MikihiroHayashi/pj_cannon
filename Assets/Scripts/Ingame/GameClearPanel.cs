@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.SceneManagement;
 
 // ゲームクリアパネルのコントローラークラス
 public class GameClearPanel : MonoBehaviour
@@ -11,27 +10,29 @@ public class GameClearPanel : MonoBehaviour
     public Button homeButton;           // ホームボタン
     public TMP_Text finalScoreText;     // 最終スコアテキスト
     public TMP_Text highScoreText;      // ハイスコアテキスト（オプション）
-
-    [Header("シーン設定")]
-    public string homeSceneName = "Title";  // ホーム画面のシーン名
-
+    
+    private GameManager gameManager;    // ゲームマネージャーへの参照
+    
     void Start()
     {
+        // ゲームマネージャーへの参照を取得
+        gameManager = GameManager.Instance;
+        
         // ボタンのイベントを設定
         if (restartButton != null)
         {
             restartButton.onClick.AddListener(OnRestartButtonClicked);
         }
-
+        
         if (homeButton != null)
         {
             homeButton.onClick.AddListener(OnHomeButtonClicked);
         }
-
+        
         // 初期状態では非表示
         gameObject.SetActive(false);
     }
-
+    
     // パネルを表示する際の初期化
     public void Initialize(int score)
     {
@@ -40,24 +41,24 @@ public class GameClearPanel : MonoBehaviour
         {
             finalScoreText.text = "SCORE: " + score.ToString();
         }
-
+        
         // ハイスコア表示（オプション）
         UpdateHighScore(score);
     }
-
+    
     // ハイスコア更新と表示
     private void UpdateHighScore(int currentScore)
     {
         // ハイスコアを取得
         int highScore = PlayerPrefs.GetInt("HighScore", 0);
-
+        
         // ハイスコア更新チェック
         if (currentScore > highScore)
         {
             highScore = currentScore;
             PlayerPrefs.SetInt("HighScore", highScore);
             PlayerPrefs.Save();
-
+            
             // 新記録表示（オプション）
             if (highScoreText != null)
             {
@@ -73,43 +74,35 @@ public class GameClearPanel : MonoBehaviour
             }
         }
     }
-
+    
     // リスタートボタンクリック時
     private void OnRestartButtonClicked()
     {
         Debug.Log("リスタートボタンがクリックされました");
-
-        // UIManager があれば利用
-        UIManager uiManager = FindObjectOfType<UIManager>();
-        if (uiManager != null)
+        
+        if (gameManager != null)
         {
-            uiManager.RestartScene();
-            return;
+            // その場でリスタート（シーンリロードなし）
+            gameManager.RestartGameInPlace();
         }
-
-        // GameManager があれば利用
-        if (GameManager.Instance != null)
+        else
         {
-            GameManager.Instance.RestartWithSceneReload();
-            return;
+            Debug.LogError("GameManagerが見つかりません");
         }
-
-        // どちらもなければ直接シーンをリロード
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
-
+    
     // ホームボタンクリック時
     private void OnHomeButtonClicked()
     {
         Debug.Log("ホームボタンがクリックされました");
-
-        // GameManager のインスタンスを削除（オプション）
-        if (GameManager.Instance != null)
+        
+        if (gameManager != null)
         {
-            Destroy(GameManager.Instance.gameObject);
+            gameManager.ReturnToHome();
         }
-
-        // タイトルシーンをロード
-        SceneManager.LoadScene(homeSceneName);
+        else
+        {
+            Debug.LogError("GameManagerが見つかりません");
+        }
     }
 }
