@@ -66,7 +66,9 @@ public class GameManager : MonoBehaviour
             Debug.LogError("UIManagerが見つかりません。UI機能が制限されます。");
         }
 
-        // シーンリロード後の状態復元チェック
+        // 状態復元のチェックを削除
+        // 以下のコードをコメントアウトまたは削除:
+        /*
         if (PlayerPrefs.GetInt("ShouldRestoreState", 0) == 1)
         {
             // リロード中フラグをリセット
@@ -79,7 +81,12 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.SetInt("ShouldRestoreState", 0);
             PlayerPrefs.Save();
         }
+        */
+
+        // リロード中フラグをリセット
+        isReloading = false;
     }
+
 
     void Start()
     {
@@ -474,29 +481,11 @@ public class GameManager : MonoBehaviour
         // リロード中フラグをオン
         isReloading = true;
 
-        // TargetGeneratorから stageConfigs を取得
-        if (targetGenerator == null)
-        {
-            targetGenerator = FindObjectOfType<TargetGenerator>();
-        }
-
-        // 現在のステージ情報を保存
-        int stageToSave = currentStage;
-        if (targetGenerator != null && targetGenerator.stageConfigs != null)
-        {
-            stageConfigs = targetGenerator.stageConfigs;
-            stageToSave = Mathf.Clamp(currentStage, 0, stageConfigs.Length - 1);
-        }
-        else
-        {
-            Debug.LogWarning("ステージ設定が見つかりません。ステージ0を保存します。");
-            stageToSave = 0;
-        }
-
-        // ステージ情報と状態復元フラグを保存
-        PlayerPrefs.SetInt("CurrentStage", stageToSave);
-        PlayerPrefs.SetInt("ShouldRestoreState", 1);
-        PlayerPrefs.Save();
+        // ステージ情報を保存しない
+        // 以下の行を削除:
+        // PlayerPrefs.SetInt("CurrentStage", stageToSave);
+        // PlayerPrefs.SetInt("ShouldRestoreState", 1);
+        // PlayerPrefs.Save();
 
         // UIManager経由でシーンをリロード
         if (uiManager != null)
@@ -592,60 +581,13 @@ public class GameManager : MonoBehaviour
     // シーンリロード後に状態を復元
     void RestoreStateAfterReload()
     {
-        Debug.Log("リロード後の状態復元を開始します");
+        // 進行度を復元しない
+        Debug.Log("アーケードモード: 進行度は保存されません");
 
-        try
-        {
-            // TargetGeneratorから stageConfigs を取得
-            if (targetGenerator == null)
-            {
-                targetGenerator = FindObjectOfType<TargetGenerator>();
-            }
-
-            // 保存されたステージインデックスを取得
-            if (targetGenerator != null && targetGenerator.stageConfigs != null)
-            {
-                stageConfigs = targetGenerator.stageConfigs;
-                currentStage = Mathf.Clamp(PlayerPrefs.GetInt("CurrentStage", 0), 0, stageConfigs.Length - 1);
-            }
-            else
-            {
-                Debug.LogError("ステージ設定が見つかりません。ステージを0にリセットします。");
-                currentStage = 0;
-            }
-
-            Debug.Log($"リロード後に状態を復元: ステージ={currentStage}");
-
-            if (targetGenerator != null)
-            {
-                // TargetGeneratorのステージインデックスを同期
-                targetGenerator.currentStage = currentStage;
-
-                // 既存のターゲットをクリア (安全のため)
-                targetGenerator.ClearTargets();
-            }
-            else
-            {
-                Debug.LogError("状態復元中にTargetGeneratorが見つかりません");
-            }
-
-            // 保存されたデータを使用してゲーム状態を復元
-            InitializeGame();
-
-            // 初期化済みフラグ設定
-            isGameInitialized = true;
-
-            Debug.Log("状態復元が完了しました");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"RestoreStateAfterReload中にエラーが発生しました: {e.Message}\n{e.StackTrace}");
-
-            // エラー発生時のフォールバック - 通常の初期化
-            currentStage = 0;
-            InitializeGame();
-            isGameInitialized = true;
-        }
+        // 常に最初のステージから開始
+        currentStage = 0;
+        InitializeGame();
+        isGameInitialized = true;
     }
 
     void OnDestroy()
