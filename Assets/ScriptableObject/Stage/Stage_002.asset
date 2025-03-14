@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stageName: Stage 2
   isUnlocked: 1
-  targetCount: 5
-  requiredTargetsToDestroy: 5
+  targetCount: 1
+  requiredTargetsToDestroy: 1
   timeLimit: 30
   shotLimit: 100
   stageTargetPrefabs:
@@ -28,7 +28,7 @@ MonoBehaviour:
   heightRange: {x: -5, y: 2}
   useRandomRotation: 0
   allowOverlap: 0
-  minTargetDistance: 5
+  minTargetDistance: 3
   enableWind: 0
   windStrength: 0
   enableMovingTargets: 0
