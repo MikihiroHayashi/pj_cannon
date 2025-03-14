@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 818e0689e3feb8c4e9502973bba6355b, type: 3}
+  m_Name: Stage_002
+  m_EditorClassIdentifier: 
+  stageName: Stage 2
+  isUnlocked: 1
+  targetCount: 5
+  requiredTargetsToDestroy: 5
+  timeLimit: 30
+  shotLimit: 100
+  stageTargetPrefabs:
+  - {fileID: 6589048845479497798, guid: 8e923b4f615e75b40a805fa4e1f28dda, type: 3}
+  - {fileID: 6589048845479497798, guid: 8753a7ba75e7917468b846f91661cd5e, type: 3}
+  - {fileID: 6589048845479497798, guid: 939b21e94c83de547ab2650961489109, type: 3}
+  scoreRange: {x: 200, y: 200}
+  spawnArea: {fileID: 4202555485946799411, guid: 9d7509073789d044b8ad360473aa87cd,
+    type: 3}
+  heightRange: {x: -5, y: 2}
+  useRandomRotation: 0
+  allowOverlap: 0
+  minTargetDistance: 5
+  enableWind: 0
+  windStrength: 0
+  enableMovingTargets: 0
+  movingTargetSpeed: 0
+  distributeTargetsEvenly: 1

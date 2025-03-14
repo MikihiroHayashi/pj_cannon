@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-// ゲームマネージャー - ステージ管理機能追加版
+// ゲームマネージャー - ScriptableObjectステージ管理対応版
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -73,7 +74,7 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogError("TargetGeneratorが見つかりません。ゲーム機能が制限されます。");
         }
-        
+
         // GameClearPanelの確認
         if (gameClearPanel == null)
         {
@@ -85,17 +86,26 @@ public class GameManager : MonoBehaviour
                 Debug.LogWarning("GameClearPanelをタグからも見つけられませんでした。クリア表示ができません。");
             }
         }
-        
-        // ゲーム初期化 (開始時に一度だけ実行)
-        if (!isGameInitialized)
+
+        // シーンリロード後の状態復元チェック
+        if (PlayerPrefs.GetInt("ShouldRestoreState", 0) == 1)
         {
-            // 初期ステージ開始表示
-            StartCoroutine(ShowStageStart(currentStage));
-            InitializeGame();
-            isGameInitialized = true;
+            RestoreStateAfterReload();
+        }
+        else
+        {
+            // 通常の初期化
+            // ゲーム初期化 (開始時に一度だけ実行)
+            if (!isGameInitialized)
+            {
+                // 初期ステージ開始表示
+                StartCoroutine(ShowStageStart(currentStage));
+                InitializeGame();
+                isGameInitialized = true;
+            }
         }
     }
-    
+
     // ゲーム初期化
     void InitializeGame()
     {
@@ -111,7 +121,7 @@ public class GameManager : MonoBehaviour
             targetGenerator.currentStage = currentStage;
             
             // ステージ設定を取得
-            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+            StageConfigSO config = targetGenerator.GetCurrentStageConfig();
             if (config != null)
             {
                 // ステージ設定から値を設定
@@ -139,7 +149,7 @@ public class GameManager : MonoBehaviour
             }
             
             // ステージ名を表示
-            if (stageNameText != null)
+            if (stageNameText != null && config != null)
             {
                 stageNameText.text = config.stageName;
             }
@@ -259,7 +269,7 @@ public class GameManager : MonoBehaviour
     }
 
     // クリア条件をチェック
-    private void CheckClearCondition()
+    void CheckClearCondition()
     {
         // デバッグログを追加
         Debug.Log($"[CheckClearCondition] 破壊ターゲット:{destroyedTargets}, 必要数:{requiredTargetsToDestroy}, 遷移中:{isTransitioning}");
@@ -324,14 +334,14 @@ public class GameManager : MonoBehaviour
     }
 
     // ゲームオーバー処理
-    public void GameOver()
+    void GameOver()
     {
         Debug.Log("ゲームオーバー");
         if (gameOverPanel) gameOverPanel.SetActive(true);
     }
 
     // ゲームクリア処理
-    public void GameClear()
+    void GameClear()
     {
         Debug.Log("ゲームクリア！最終スコア: " + currentScore);
         
@@ -348,10 +358,10 @@ public class GameManager : MonoBehaviour
         // 最終ステージかどうかをチェック
         bool isFinalStage = false;
         
-        if (targetGenerator != null && targetGenerator.stages != null)
+        if (targetGenerator != null && targetGenerator.stageConfigs != null)
         {
-            isFinalStage = (currentStage >= targetGenerator.stages.Length - 1);
-            Debug.Log($"ステージ状態: 現在={currentStage}, 最大={targetGenerator.stages.Length - 1}, 最終ステージ={isFinalStage}");
+            isFinalStage = (currentStage >= targetGenerator.stageConfigs.Length - 1);
+            Debug.Log($"ステージ状態: 現在={currentStage}, 最大={targetGenerator.stageConfigs.Length - 1}, 最終ステージ={isFinalStage}");
         }
         else
         {
@@ -397,7 +407,7 @@ public class GameManager : MonoBehaviour
     }
     
     // ステージ遷移処理のコルーチン
-    private IEnumerator PerformStageTransition()
+    IEnumerator PerformStageTransition()
     {
         // 1. ステージクリアUIを表示（2秒）
         if (stageClearUI && stageClearText)
@@ -437,7 +447,7 @@ public class GameManager : MonoBehaviour
     }
     
     // ステージ開始表示のコルーチン
-    private IEnumerator ShowStageStart(int stageIndex)
+    IEnumerator ShowStageStart(int stageIndex)
     {
         if (stageStartUI && stageStartText)
         {
@@ -445,7 +455,7 @@ public class GameManager : MonoBehaviour
             string stageName = "STAGE " + (stageIndex + 1);
             if (targetGenerator != null)
             {
-                TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+                StageConfigSO config = targetGenerator.GetCurrentStageConfig();
                 if (config != null && !string.IsNullOrEmpty(config.stageName))
                 {
                     stageName = config.stageName.ToUpper();
@@ -463,7 +473,7 @@ public class GameManager : MonoBehaviour
     }
     
     // 新しいステージ用にゲーム変数を初期化
-    private void InitializeGameVarsForNewStage()
+    void InitializeGameVarsForNewStage()
     {
         // スコアはそのまま継続
         // currentScore = 0; // スコアをリセットする場合はコメント解除
@@ -474,7 +484,7 @@ public class GameManager : MonoBehaviour
         // ステージ設定を取得
         if (targetGenerator != null)
         {
-            TargetGenerator.StageConfig config = targetGenerator.GetCurrentStageConfig();
+            StageConfigSO config = targetGenerator.GetCurrentStageConfig();
             if (config != null)
             {
                 // ステージ設定からパラメータを更新
@@ -520,58 +530,119 @@ public class GameManager : MonoBehaviour
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
-    
-    // その場でリスタート処理 - シーンリロードなしでゲーム状態をリセット
+
     public void RestartGameInPlace()
     {
-        Debug.Log("ゲームリスタート（その場）");
-        
+        Debug.Log($"ゲームリスタート（その場）: 現在のステージ = {currentStage}");
+
+        // 遷移中フラグをオン（処理中に更新されないように）
+        isTransitioning = true;
+
         // スコアリセット
         currentScore = 0;
         destroyedTargets = 0;
-        
-        // ショット回数リセット
+
+        // ターゲット生成器の確認と同期
+        if (targetGenerator == null)
+        {
+            targetGenerator = FindObjectOfType<TargetGenerator>();
+            Debug.Log("TargetGeneratorの参照を再取得: " + (targetGenerator != null ? "成功" : "失敗"));
+        }
+
+        if (targetGenerator != null)
+        {
+            // 現在のステージを明示的に設定
+            targetGenerator.currentStage = currentStage;
+
+            // ステージ設定を再取得
+            StageConfigSO config = targetGenerator.GetCurrentStageConfig();
+            if (config != null)
+            {
+                // ステージパラメータを再設定
+                shotLimit = config.shotLimit;
+                gameTime = config.timeLimit;
+                requiredTargetsToDestroy = config.requiredTargetsToDestroy;
+
+                Debug.Log($"ステージ {currentStage} ({config.stageName}) の設定を再適用: " +
+                         $"ターゲット予定数={config.targetCount}, " +
+                         $"必要破壊数={requiredTargetsToDestroy}");
+            }
+
+            // 既存のターゲットをクリア
+            targetGenerator.ClearTargets();
+
+            // 現在のステージのターゲットを再生成
+            targetGenerator.InitializeCurrentStage();
+
+            // 生成されたターゲット数を取得
+            targetCount = targetGenerator.GetGeneratedTargetsCount();
+            Debug.Log($"再生成されたターゲット数: {targetCount}");
+
+            // クリア条件の再確認
+            if (requiredTargetsToDestroy <= 0 || requiredTargetsToDestroy > targetCount)
+            {
+                requiredTargetsToDestroy = targetCount;
+                Debug.Log($"クリア条件を再設定: 全ターゲット破壊に変更 ({requiredTargetsToDestroy})");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("TargetGeneratorが見つかりません。基本的なリセットのみ実行します。");
+            // 従来の手動検索でターゲット数を更新
+            GameObject[] existingTargets = GameObject.FindGameObjectsWithTag("Target");
+            targetCount = existingTargets.Length;
+        }
+
+        // 残り発射数を設定
         remainingShots = shotLimit;
-        
-        // タイマーリセット
+
+        // 残り時間を設定
         remainingTime = gameTime;
-        
-        // ターゲットの再生成・再設定
-        ResetTargets();
-        
+
         // 大砲の位置・角度リセット
         ResetCannon();
-        
+
         // UI更新
         UpdateUI();
-        
+
         // ゲームクリア/ゲームオーバーパネルを非表示
         if (gameClearPanel) gameClearPanel.SetActive(false);
         if (gameOverPanel) gameOverPanel.SetActive(false);
         if (stageClearUI) stageClearUI.SetActive(false);
         if (stageStartUI) stageStartUI.SetActive(false);
-        
+
         // 遷移中フラグをオフ
         isTransitioning = false;
-        
-        Debug.Log("ゲームを初期状態に戻しました");
+
+        Debug.Log($"ゲームを初期状態に戻しました - 現在のステージ: {currentStage}, ターゲット数: {targetCount}");
     }
-    
-    // ターゲットをリセット
-    private void ResetTargets()
+
+    // ResetTargets メソッドの修正版
+
+    void ResetTargets()
     {
         // TargetGeneratorがあれば利用
         if (targetGenerator != null)
         {
+            // ステージ設定を再取得
+            StageConfigSO config = targetGenerator.GetCurrentStageConfig();
+            if (config != null)
+            {
+                Debug.Log($"ターゲットをリセット: ステージ {currentStage} ({config.stageName})");
+            }
+
             targetGenerator.ClearTargets(); // 既存のターゲットをクリア
-            targetGenerator.InitializeCurrentStage(); // 新しいターゲットを生成
+            targetGenerator.InitializeCurrentStage(); // 現在のステージのターゲットを生成
+
+            // ターゲット数を更新
+            targetCount = targetGenerator.GetGeneratedTargetsCount();
         }
         else
         {
             // 既存のターゲットを検索
             GameObject[] existingTargets = GameObject.FindGameObjectsWithTag("Target");
             targetCount = existingTargets.Length;
-            
+
             // 無効化されたターゲットを再アクティブ化（オプション）
             foreach (GameObject target in existingTargets)
             {
@@ -582,28 +653,28 @@ public class GameManager : MonoBehaviour
                     targetCount++;
                 }
             }
-            
+
             // ターゲットが全て削除されていた場合の再生成ロジック（オプション）
             if (targetCount == 0)
             {
                 Debug.LogWarning("ターゲットが見つかりません。TargetGeneratorの導入を検討してください。");
             }
-            
+
             Debug.Log($"ターゲット数を {targetCount} にリセットしました");
         }
-        
+
         // 破壊カウントをリセット
         destroyedTargets = 0;
-        
+
         // クリア条件が未設定の場合、全ターゲット破壊を設定
         if (requiredTargetsToDestroy <= 0 || requiredTargetsToDestroy > targetCount)
         {
             requiredTargetsToDestroy = targetCount;
         }
     }
-    
+
     // 大砲をリセット
-    private void ResetCannon()
+    void ResetCannon()
     {
         // 全ての大砲コントローラーを検索
         CannonController[] cannons = FindObjectsOfType<CannonController>();
@@ -629,7 +700,7 @@ public class GameManager : MonoBehaviour
     }
     
     // 特定のステージにジャンプ
-    public void JumpToStage(int stageIndex)
+    void JumpToStage(int stageIndex)
     {
         if (targetGenerator == null)
         {
@@ -638,14 +709,14 @@ public class GameManager : MonoBehaviour
         }
         
         // ステージ範囲チェック
-        if (stageIndex < 0 || stageIndex >= targetGenerator.stages.Length)
+        if (stageIndex < 0 || stageIndex >= targetGenerator.stageConfigs.Length)
         {
             Debug.LogError($"無効なステージインデックス: {stageIndex}");
             return;
         }
         
         // ステージが解放されているかチェック
-        if (!targetGenerator.stages[stageIndex].isUnlocked)
+        if (!targetGenerator.stageConfigs[stageIndex].isUnlocked)
         {
             Debug.LogWarning($"ステージ {stageIndex} はまだロックされています。");
             return;
@@ -663,7 +734,7 @@ public class GameManager : MonoBehaviour
     }
     
     // ステージにジャンプする際のシーケンス
-    private IEnumerator JumpToStageSequence(int stageIndex)
+    IEnumerator JumpToStageSequence(int stageIndex)
     {
         // ステージ開始UIを表示
         yield return StartCoroutine(ShowStageStart(stageIndex));
@@ -687,6 +758,181 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("強制的にクリア処理を実行します");
         GameClear();
+    }
+
+    // GameManagerクラス内に、デバッグ用のメソッドも追加しておく
+    public void LogStageInfo()
+    {
+        if (targetGenerator != null)
+        {
+            StageConfigSO config = targetGenerator.GetCurrentStageConfig();
+            string stageName = config != null ? config.stageName : "Unknown";
+
+            Debug.Log($"現在のステージ情報 - インデックス: {currentStage}, 名前: {stageName}, " +
+                     $"TargetGenerator内のステージ: {targetGenerator.currentStage}");
+        }
+        else
+        {
+            Debug.Log($"現在のステージ情報 - インデックス: {currentStage}, TargetGenerator: なし");
+        }
+    }
+
+    // シーンローディング用の新しい公開メソッド
+    public void RestartWithSceneReload()
+    {
+        Debug.Log("シーンリロードでリスタートします");
+
+        // 現在のステージ情報を保存
+        SaveCurrentStageInfo();
+
+        // フェードアウト/フェードイン付きでシーンをリロード
+        StartCoroutine(ReloadSceneWithFade());
+    }
+
+    // 現在のステージ情報をPlayerPrefsに保存
+    private void SaveCurrentStageInfo()
+    {
+        // 現在のステージインデックスを保存
+        PlayerPrefs.SetInt("CurrentStage", currentStage);
+
+        // スコアを保存（オプション）
+        PlayerPrefs.SetInt("CurrentScore", currentScore);
+
+        // その他必要な情報を保存
+        // ...
+
+        // 確実に保存
+        PlayerPrefs.Save();
+
+        Debug.Log($"現在のステージ情報を保存しました: ステージ={currentStage}");
+    }
+
+    // フェード付きでシーンをリロードするコルーチン
+    private IEnumerator ReloadSceneWithFade()
+    {
+        // フェードアウトのUI（黒いパネル）
+        GameObject fadePanel = CreateFadePanel();
+        CanvasGroup canvasGroup = fadePanel.GetComponent<CanvasGroup>();
+
+        // フェードアウト（暗くする）
+        float fadeOutDuration = 0.5f;
+        float timer = 0f;
+
+        while (timer < fadeOutDuration)
+        {
+            timer += Time.deltaTime;
+            canvasGroup.alpha = Mathf.Lerp(0f, 1f, timer / fadeOutDuration);
+            yield return null;
+        }
+
+        // アルファ値を確実に1にする
+        canvasGroup.alpha = 1f;
+
+        // 少し待機
+        yield return new WaitForSeconds(0.2f);
+
+        // 現在のシーンを非同期でリロード
+        string currentSceneName = SceneManager.GetActiveScene().name;
+        AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(currentSceneName);
+
+        // シーン読み込みが完了するまで待機
+        while (!asyncLoad.isDone)
+        {
+            yield return null;
+        }
+
+        // シーンがロードされたらスタート時に情報を復元するフラグを設定
+        PlayerPrefs.SetInt("ShouldRestoreState", 1);
+        PlayerPrefs.Save();
+    }
+
+    // フェードパネルを作成
+    private GameObject CreateFadePanel()
+    {
+        // フェード用の黒いパネルを作成
+        GameObject fadePanel = new GameObject("FadePanel");
+        Canvas canvas = FindObjectOfType<Canvas>();
+
+        // キャンバスがない場合は作成
+        if (canvas == null)
+        {
+            GameObject canvasObj = new GameObject("Canvas");
+            canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
+            canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+        }
+
+        // パネルを設定
+        fadePanel.transform.SetParent(canvas.transform, false);
+        fadePanel.AddComponent<UnityEngine.UI.Image>().color = Color.black;
+
+        // キャンバスグループを追加してアルファ値を操作できるようにする
+        CanvasGroup canvasGroup = fadePanel.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f; // 最初は透明
+
+        // フルスクリーンサイズに設定
+        RectTransform rectTransform = fadePanel.GetComponent<RectTransform>();
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.sizeDelta = Vector2.zero;
+        rectTransform.anchoredPosition = Vector2.zero;
+
+        // 最前面に表示
+        fadePanel.transform.SetAsLastSibling();
+
+        return fadePanel;
+    }
+
+    // Startメソッドに追加するコード (GameManagerのStartメソッド内部に追加)
+    // 以下は既存のStartメソッド内に追加する部分です
+    /*
+    void Start()
+    {
+        // 既存のコード...
+
+        // シーンリロード後の状態復元チェック
+        if (PlayerPrefs.GetInt("ShouldRestoreState", 0) == 1)
+        {
+            RestoreStateAfterReload();
+            PlayerPrefs.SetInt("ShouldRestoreState", 0);
+            PlayerPrefs.Save();
+        }
+
+        // 残りの既存のコード...
+    }
+    */
+
+    // シーンリロード後に状態を復元
+    private void RestoreStateAfterReload()
+    {
+        Debug.Log("リロード後の状態復元を開始します");
+
+        // 保存されたステージインデックスを取得
+        currentStage = PlayerPrefs.GetInt("CurrentStage", 0);
+
+        // スコア（オプション）
+        // currentScore = PlayerPrefs.GetInt("CurrentScore", 0);
+
+        Debug.Log($"リロード後に状態を復元: ステージ={currentStage}");
+
+        // TargetGeneratorの設定
+        if (targetGenerator != null)
+        {
+            targetGenerator.currentStage = currentStage;
+        }
+
+        // 保存されたステージインデックスで初期化
+        InitializeGame();
+
+        // 初期化済みフラグ設定
+        isGameInitialized = true;
+
+        // 状態復元フラグをリセット
+        PlayerPrefs.SetInt("ShouldRestoreState", 0);
+        PlayerPrefs.Save();
+
+        Debug.Log("状態復元が完了しました");
     }
 }
 
