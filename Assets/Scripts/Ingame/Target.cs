@@ -166,4 +166,20 @@ public class Target : MonoBehaviour
             Debug.Log($"エフェクト '{effect.name}' に自動削除コンポーネントを追加しました");
         }
     }
+
+    private void OnDrawGizmosSelected()
+    {
+        // エディターモードでのみ実行
+#if UNITY_EDITOR
+    if (!Application.isPlaying)
+    {
+        // スコア値が有効な場合、シーンビューに表示
+        if (scoreValue > 0)
+        {
+            UnityEditor.Handles.Label(transform.position + Vector3.up * 2f, $"Score: {scoreValue}", 
+                new GUIStyle() { fontSize = 16, fontStyle = FontStyle.Bold, normal = { textColor = Color.yellow } });
+        }
+    }
+#endif
+    }
 }

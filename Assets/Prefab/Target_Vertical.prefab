@@ -98,7 +98,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a500d8d37721f49418d58d66e4f259c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scoreValue: 100
+  scoreValue: 200
   isDestructible: 1
   hitEffectPrefab: {fileID: 575556569789218312, guid: de873a2b4f008404098f98bc6aa44785,
     type: 3}

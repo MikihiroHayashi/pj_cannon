@@ -34,4 +34,5 @@ public class StageConfigSO : ScriptableObject
     public bool enableMovingTargets = false;   // 動くターゲットを有効にするか
     public float movingTargetSpeed = 1.0f;     // 動くターゲットの速度
     public bool distributeTargetsEvenly = true; // ターゲットを均等に分布させるか
+
 }
