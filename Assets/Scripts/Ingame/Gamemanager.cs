@@ -65,6 +65,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // GameManager.cs内のStart()メソッドを修正
     void Start()
     {
         // ターゲット生成クラスの参照を取得
@@ -80,7 +81,7 @@ public class GameManager : MonoBehaviour
             targetGenerator.currentStage = 0;
             Debug.Log("ゲーム開始時にステージを0に設定しました");
         }
-        
+
         // GameClearPanelの確認
         if (gameClearPanel == null)
         {
@@ -92,17 +93,30 @@ public class GameManager : MonoBehaviour
                 Debug.LogWarning("GameClearPanelをタグからも見つけられませんでした。クリア表示ができません。");
             }
         }
-        
+
         // ゲーム初期化 (開始時に一度だけ実行)
         if (!isGameInitialized)
         {
-            // 初期ステージ開始表示
-            StartCoroutine(ShowStageStart(currentStage));
-            InitializeGame();
+            // シーケンス処理に変更 - コルーチンを使って処理順序を確保
+            StartCoroutine(InitializeGameSequence());
             isGameInitialized = true;
         }
     }
-    
+
+    private IEnumerator InitializeGameSequence()
+    {
+        // すべてのUI要素を確実に非表示にする
+        if (stageClearUI) stageClearUI.SetActive(false);
+        if (gameOverPanel) gameOverPanel.SetActive(false);
+        if (gameClearPanel) gameClearPanel.SetActive(false);
+
+        // ステージ開始表示を行い、完了を待つ
+        yield return StartCoroutine(ShowStageStart(currentStage));
+
+        // その後でゲーム初期化を行う
+        InitializeGame();
+    }
+
     // ゲーム初期化
     void InitializeGame()
     {
@@ -536,25 +550,29 @@ public class GameManager : MonoBehaviour
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
-    
+
+    // その場でリスタート処理 - シーンリロードなしでゲーム状態をリセット
     // その場でリスタート処理 - シーンリロードなしでゲーム状態をリセット
     public void RestartGameInPlace()
     {
         Debug.Log("ゲームリスタート（その場）");
-        
+
+        // 遷移中フラグをオンに設定（処理中の操作を防止）
+        isTransitioning = true;
+
         // ステージを0に戻す
         currentStage = 0;
-        
+
         // スコアリセット
         currentScore = 0;
         destroyedTargets = 0;
-        
+
         // ショット回数リセット
         remainingShots = shotLimit;
-        
+
         // タイマーリセット
         remainingTime = gameTime;
-        
+
         // ターゲットの再生成・再設定
         // TargetGeneratorにも現在のステージ情報を渡す
         if (targetGenerator != null)
@@ -562,25 +580,40 @@ public class GameManager : MonoBehaviour
             targetGenerator.currentStage = currentStage;
         }
         ResetTargets();
-        
+
         // 大砲の位置・角度リセット
         ResetCannon();
-        
+
         // UI更新
         UpdateUI();
-        
+
         // ゲームクリア/ゲームオーバーパネルを非表示
         if (gameClearPanel) gameClearPanel.SetActive(false);
         if (gameOverPanel) gameOverPanel.SetActive(false);
         if (stageClearUI) stageClearUI.SetActive(false);
         if (stageStartUI) stageStartUI.SetActive(false);
-        
-        // 遷移中フラグをオフ
-        isTransitioning = false;
-        
-        Debug.Log("ゲームを初期状態に戻しました");
+
+        // リスタート時のステージ表示を行うコルーチンを開始
+        StartCoroutine(RestartGameSequence());
     }
-    
+
+    // リスタート時のシーケンス処理用コルーチン
+    private IEnumerator RestartGameSequence()
+    {
+        // すべてのUIパネルを確実に非表示にする
+        if (stageClearUI) stageClearUI.SetActive(false);
+        if (gameOverPanel) gameOverPanel.SetActive(false);
+        if (gameClearPanel) gameClearPanel.SetActive(false);
+
+        // ステージ開始表示を行い、完了を待つ
+        yield return StartCoroutine(ShowStageStart(currentStage));
+
+        // 遷移中フラグをオフに設定（操作を再開可能に）
+        isTransitioning = false;
+
+        Debug.Log("ゲームを初期状態に戻し、ステージ表示を完了しました");
+    }
+
     // ターゲットをリセット
     private void ResetTargets()
     {
