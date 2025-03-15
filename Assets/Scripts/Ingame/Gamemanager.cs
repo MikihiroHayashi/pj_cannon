@@ -334,8 +334,8 @@ public class GameManager : MonoBehaviour
     // UI更新
     public void UpdateUI()
     {
-        if (scoreText) scoreText.text = "SCORE: " + currentScore.ToString();
-        if (shotText) shotText.text = "SHOTS LEFT: " + remainingShots.ToString();
+        if (scoreText) scoreText.text = currentScore.ToString();
+        if (shotText) shotText.text = "残弾数　 " + remainingShots.ToString();
         
         // ターゲット数表示（新規追加）
         if (targetCountText)
@@ -348,6 +348,7 @@ public class GameManager : MonoBehaviour
     public void GameOver()
     {
         Debug.Log("ゲームオーバー");
+        isTransitioning = true; // 遷移中フラグをオンに設定
         if (gameOverPanel) gameOverPanel.SetActive(true);
     }
 
@@ -745,6 +746,11 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log("強制的にクリア処理を実行します");
         GameClear();
+    }
+
+    public bool IsGameTransitioning()
+    {
+        return isTransitioning;
     }
 }
 

@@ -17,10 +17,11 @@ MonoBehaviour:
   targetCount: 2
   requiredTargetsToDestroy: 2
   timeLimit: 180
-  shotLimit: 5
+  shotLimit: 10
   stageTargetPrefabs: []
   scoreRange: {x: 50, y: 200}
-  spawnArea: {fileID: 0}
+  spawnArea: {fileID: 4861381637549153141, guid: 0980c2b4f9c919348acbf500bba7c6f6,
+    type: 3}
   heightRange: {x: -5, y: 2}
   useRandomRotation: 0
   allowOverlap: 0

@@ -530,6 +530,12 @@ public class CannonController : MonoBehaviour
     // 大砲を発射（外部からも呼び出せるようにpublic）
     public void FireCannon()
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsGameTransitioning())
+        {
+            Debug.Log("遷移中のため、大砲を発射できません");
+            return; // 発射処理を中断
+        }
+
         Debug.Log("大砲を発射！");
         
         // カメラシェイクを適用
