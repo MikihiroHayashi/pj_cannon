@@ -10,19 +10,19 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3399d690a32e16740ac072dcbe32eff0, type: 3}
-  m_Name: StageConfig_003
+  m_Name: Stage_005
   m_EditorClassIdentifier: 
-  stageName: Stage 3
+  stageName: Stage 5
   isUnlocked: 1
-  targetCount: 2
-  requiredTargetsToDestroy: 2
+  targetCount: 3
+  requiredTargetsToDestroy: 3
   timeLimit: 180
   shotLimit: 5
   stageTargetPrefabs: []
   scoreRange: {x: 50, y: 200}
   spawnArea: {fileID: 0}
-  heightRange: {x: -5, y: 2}
-  useRandomRotation: 1
+  heightRange: {x: 5, y: 2}
+  useRandomRotation: 0
   allowOverlap: 0
   minTargetDistance: 2
   enableWind: 0
